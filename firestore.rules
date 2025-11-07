@@ -1,0 +1,127 @@
+# Camply PWA - Firebase Firestore Security Rules
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function to check if user owns the document
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Helper function to check if user is admin
+    function isAdmin() {
+      return isAuthenticated() && request.auth.token.email == 'admin@gmail.com';
+    }
+    
+    // Users collection
+    match /users/{userId} {
+      // Anyone can read user profiles (for leaderboard)
+      allow read: if isAuthenticated();
+      
+      // Users can only create/update their own profile
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      allow update: if isOwner(userId) || isAdmin();
+      
+      // Only admins can delete users
+      allow delete: if isAdmin();
+    }
+    
+    // Daily Tasks collection
+    match /dailyTasks/{taskId} {
+      // Users can read their own tasks
+      allow read: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || isAdmin()
+      );
+      
+      // Users can create their own tasks
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      
+      // Users can update their own tasks
+      allow update: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || isAdmin()
+      );
+      
+      // Users can delete their own tasks, admins can delete any
+      allow delete: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || isAdmin()
+      );
+    }
+    
+    // Diary Entries collection
+    match /diaryEntries/{entryId} {
+      // Users can read their own entries
+      allow read: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || isAdmin()
+      );
+      
+      // Users can create their own entries
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      
+      // Users can update their own entries
+      allow update: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || isAdmin()
+      );
+      
+      // Users can delete their own entries, admins can delete any
+      allow delete: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || isAdmin()
+      );
+    }
+    
+    // Weekly Goals collection
+    match /weeklyGoals/{goalId} {
+      // Users can read their own goals
+      allow read: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || isAdmin()
+      );
+      
+      // Users can create their own goals
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      
+      // Users can update their own goals
+      allow update: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || isAdmin()
+      );
+      
+      // Users can delete their own goals, admins can delete any
+      allow delete: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || isAdmin()
+      );
+    }
+    
+    // Prompts collection (read-only for users, admin can modify)
+    match /prompts/{promptId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+    
+    // Badges collection (read-only for everyone)
+    match /badges/{badgeId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+  }
+}
+
+/*
+ * IMPORTANT NOTES:
+ * 
+ * 1. These rules ensure users can only access their own data
+ * 2. Admin (admin@gmail.com) has full access to all collections
+ * 3. Leaderboard functionality works because users collection is readable by all authenticated users
+ * 4. All write operations require the userId field to match the authenticated user
+ * 5. Prompts and Badges are read-only for regular users
+ * 
+ * TO DEPLOY THESE RULES:
+ * 1. Go to Firebase Console
+ * 2. Select your project (journals-app-eaa7e)
+ * 3. Go to Firestore Database > Rules
+ * 4. Copy and paste these rules
+ * 5. Click "Publish"
+ */
