@@ -20,7 +20,7 @@ interface UserData {
   currentStreak: number;
   entriesCount: number;
   unlockedBadges: string[];
-  createdAt: string;
+  createdAt: any;
 }
 
 const Profile = () => {
@@ -34,11 +34,34 @@ const Profile = () => {
   }, [user]);
 
   const fetchUserData = async () => {
-    if (!user) return;
-    
-    const userDoc = await getDoc(doc(db, "users", user.uid));
-    if (userDoc.exists()) {
-      setUserData(userDoc.data() as UserData);
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const userDocRef = doc(db, "users", user.uid);
+      const userDoc = await getDoc(userDocRef);
+
+      if (userDoc.exists()) {
+        const data = userDoc.data();
+        setUserData(data as UserData);
+      } else {
+        // Create a default user data structure if document doesn't exist
+        const defaultData = {
+          displayName: user.displayName || "User",
+          photoURL: user.photoURL || "",
+          level: 1,
+          totalXP: 0,
+          currentStreak: 0,
+          entriesCount: 0,
+          unlockedBadges: [],
+          createdAt: new Date().toISOString(),
+        };
+        setUserData(defaultData);
+      }
+    } catch (error) {
+      console.error("Error fetching user data:", error);
     }
     setLoading(false);
   };
@@ -46,6 +69,33 @@ const Profile = () => {
   const handleLogout = async () => {
     await signOut();
     navigate("/welcome");
+  };
+
+  // Calculate member days safely
+  const calculateMemberDays = () => {
+    if (!userData?.createdAt) return 1;
+
+    try {
+      let createdDate: Date;
+
+      if (userData.createdAt?.toDate) {
+        createdDate = userData.createdAt.toDate();
+      } else if (userData.createdAt?.seconds) {
+        createdDate = new Date(userData.createdAt.seconds * 1000);
+      } else {
+        createdDate = new Date(userData.createdAt);
+      }
+
+      if (isNaN(createdDate.getTime())) {
+        return 1;
+      }
+
+      const now = new Date();
+      const diffTime = Math.abs(now.getTime() - createdDate.getTime());
+      return Math.max(1, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
+    } catch (error) {
+      return 1;
+    }
   };
 
   if (loading) {
@@ -58,13 +108,14 @@ const Profile = () => {
     );
   }
 
-  const xpNeeded = userData ? xpForNextLevel(userData.level) : 100;
-  const currentLevelXP = userData ? userData.totalXP % xpNeeded : 0;
-  const xpProgress = (currentLevelXP / xpNeeded) * 100;
-  
-  const memberDays = userData?.createdAt 
-    ? Math.floor((Date.now() - new Date(userData.createdAt).getTime()) / (1000 * 60 * 60 * 24))
-    : 0;
+  // Safe calculations with defaults
+  const safeLevel = userData?.level || 1;
+  const safeTotalXP = userData?.totalXP || 0;
+  const xpNeeded = xpForNextLevel(safeLevel);
+  const currentLevelXP = safeTotalXP % xpNeeded;
+  const xpProgress = Math.min(100, (currentLevelXP / xpNeeded) * 100);
+
+  const memberDays = calculateMemberDays();
 
   return (
     <Layout>
@@ -73,15 +124,19 @@ const Profile = () => {
           <CardContent className="pt-6">
             <div className="flex flex-col items-center text-center space-y-4">
               <Avatar className="h-24 w-24">
-                <AvatarImage src={userData?.photoURL} />
+                <AvatarImage src={userData?.photoURL || user?.photoURL} />
                 <AvatarFallback className="text-2xl">
-                  {userData?.displayName?.[0]}
+                  {(userData?.displayName ||
+                    user?.displayName ||
+                    "U")[0].toUpperCase()}
                 </AvatarFallback>
               </Avatar>
-              
+
               <div>
-                <h2 className="text-2xl font-bold">{userData?.displayName}</h2>
-                <p className="text-muted-foreground">Level {userData?.level}</p>
+                <h2 className="text-2xl font-bold">
+                  {userData?.displayName || user?.displayName || "User"}
+                </h2>
+                <p className="text-muted-foreground">Level {safeLevel}</p>
               </div>
 
               <div className="w-full space-y-2">
@@ -98,14 +153,18 @@ const Profile = () => {
         <div className="grid grid-cols-2 gap-4">
           <Card>
             <CardContent className="pt-6 text-center">
-              <p className="text-3xl font-bold">{userData?.currentStreak || 0}</p>
+              <p className="text-3xl font-bold">
+                {userData?.currentStreak || 0}
+              </p>
               <p className="text-sm text-muted-foreground">days in a row</p>
             </CardContent>
           </Card>
-          
+
           <Card>
             <CardContent className="pt-6 text-center">
-              <p className="text-3xl font-bold">{userData?.entriesCount || 0}</p>
+              <p className="text-3xl font-bold">
+                {userData?.entriesCount || 0}
+              </p>
               <p className="text-sm text-muted-foreground">total journals</p>
             </CardContent>
           </Card>
@@ -130,12 +189,16 @@ const Profile = () => {
                   <div
                     key={badge.id}
                     className={`p-4 rounded-lg border ${
-                      isUnlocked ? 'bg-primary/10 border-primary' : 'bg-muted/50 opacity-50'
+                      isUnlocked
+                        ? "bg-primary/10 border-primary"
+                        : "bg-muted/50 opacity-50"
                     }`}
                   >
                     <div className="text-4xl mb-2">{badge.icon}</div>
                     <h3 className="font-semibold text-sm">{badge.name}</h3>
-                    <p className="text-xs text-muted-foreground">{badge.description}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {badge.description}
+                    </p>
                   </div>
                 );
               })}
@@ -152,7 +215,7 @@ const Profile = () => {
             <SettingsIcon className="mr-2 h-5 w-5" />
             Settings
           </Button>
-          
+
           <Button
             variant="destructive"
             className="w-full"
