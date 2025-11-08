@@ -92,9 +92,14 @@ const Diary = () => {
         const data = doc.data();
         const entryDate = parseFirestoreDate(data.date);
         const entryData: DiaryEntry = {
-          ...data,
           id: doc.id,
           date: entryDate,
+          gratitude: data.gratitude || '',
+          affirmation: data.affirmation || '',
+          notes: data.notes || '',
+          userId: data.userId,
+          createdAt: data.createdAt,
+          updatedAt: data.updatedAt,
         };
         const dateKey = entryDate.toDateString();
         entries.set(dateKey, entryData);

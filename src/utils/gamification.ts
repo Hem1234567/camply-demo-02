@@ -83,30 +83,38 @@ export const updateStreak = async (userId: string) => {
   const userData = userDoc.data();
   
   const lastActive = userData?.lastActive ? new Date(userData.lastActive) : null;
-  const now = new Date();
-  const daysDiff = lastActive ? Math.floor((now.getTime() - lastActive.getTime()) / (1000 * 60 * 60 * 24)) : 0;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
   
-  if (daysDiff === 1) {
+  let lastActiveDate: Date | null = null;
+  if (lastActive) {
+    lastActiveDate = new Date(lastActive);
+    lastActiveDate.setHours(0, 0, 0, 0);
+  }
+  
+  const daysDiff = lastActiveDate 
+    ? Math.floor((today.getTime() - lastActiveDate.getTime()) / (1000 * 60 * 60 * 24)) 
+    : -1;
+  
+  if (daysDiff === 0) {
+    return userData?.currentStreak || 1;
+  } else if (daysDiff === 1) {
     const newStreak = (userData?.currentStreak || 0) + 1;
     await updateDoc(userRef, {
       currentStreak: newStreak,
       maxStreak: Math.max(newStreak, userData?.maxStreak || 0),
-      lastActive: now.toISOString()
+      lastActive: new Date().toISOString()
     });
     
     if (newStreak === 7) await checkAndAwardBadge(userId, 'week_streak');
     if (newStreak === 30) await checkAndAwardBadge(userId, 'month_streak');
     
     return newStreak;
-  } else if (daysDiff > 1) {
+  } else {
     await updateDoc(userRef, {
       currentStreak: 1,
-      lastActive: now.toISOString()
+      lastActive: new Date().toISOString()
     });
     return 1;
-  } else if (daysDiff === 0) {
-    return userData?.currentStreak || 1;
   }
-  
-  return 1;
 };

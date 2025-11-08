@@ -66,7 +66,7 @@ const Settings = () => {
   useEffect(() => {
     if (typeof window !== "undefined") {
       const SpeechRecognition =
-        window.SpeechRecognition || window.webkitSpeechRecognition;
+        (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       if (!SpeechRecognition) {
         setIsSupported(false);
       }
@@ -89,7 +89,7 @@ const Settings = () => {
   const initializeSpeechRecognition = () => {
     if (typeof window !== "undefined") {
       const SpeechRecognition =
-        window.SpeechRecognition || window.webkitSpeechRecognition;
+        (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
       if (SpeechRecognition) {
         recognitionRef.current = new SpeechRecognition();

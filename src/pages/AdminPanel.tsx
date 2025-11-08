@@ -71,6 +71,7 @@ interface JournalEntry {
   xpEarned?: number;
   type?: string;
   questions?: any[];
+  collection?: string;
 }
 
 const AdminPanel = () => {
