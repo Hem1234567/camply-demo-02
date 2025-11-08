@@ -97,8 +97,15 @@ export const updateStreak = async (userId: string) => {
     : -1;
   
   if (daysDiff === 0) {
-    return userData?.currentStreak || 1;
+    // Same day - maintain current streak but ensure it's at least 1
+    const currentStreak = Math.max(userData?.currentStreak || 1, 1);
+    await updateDoc(userRef, {
+      currentStreak,
+      lastActive: new Date().toISOString()
+    });
+    return currentStreak;
   } else if (daysDiff === 1) {
+    // Next day - increment streak
     const newStreak = (userData?.currentStreak || 0) + 1;
     await updateDoc(userRef, {
       currentStreak: newStreak,
@@ -111,6 +118,7 @@ export const updateStreak = async (userId: string) => {
     
     return newStreak;
   } else {
+    // Missed days - reset to 1
     await updateDoc(userRef, {
       currentStreak: 1,
       lastActive: new Date().toISOString()

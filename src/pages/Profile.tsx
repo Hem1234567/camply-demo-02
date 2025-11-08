@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,24 +30,15 @@ const Profile = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchUserData();
-  }, [user]);
-
-  const fetchUserData = async () => {
     if (!user) {
       setLoading(false);
       return;
     }
 
-    try {
-      const userDocRef = doc(db, "users", user.uid);
-      const userDoc = await getDoc(userDocRef);
-
-      if (userDoc.exists()) {
-        const data = userDoc.data();
-        setUserData(data as UserData);
+    const unsubscribe = onSnapshot(doc(db, "users", user.uid), (docSnap) => {
+      if (docSnap.exists()) {
+        setUserData(docSnap.data() as UserData);
       } else {
-        // Create a default user data structure if document doesn't exist
         const defaultData = {
           displayName: user.displayName || "User",
           photoURL: user.photoURL || "",
@@ -60,11 +51,11 @@ const Profile = () => {
         };
         setUserData(defaultData);
       }
-    } catch (error) {
-      console.error("Error fetching user data:", error);
-    }
-    setLoading(false);
-  };
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
 
   const handleLogout = async () => {
     await signOut();
