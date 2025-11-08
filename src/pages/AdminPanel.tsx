@@ -321,7 +321,7 @@ const AdminPanel = () => {
   const handleLogout = async () => {
     await signOut();
     setIsAdmin(false);
-    navigate("/welcome");
+    navigate("/login");
   };
 
   const getInitials = (name: string) => {
