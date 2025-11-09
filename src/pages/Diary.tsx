@@ -92,14 +92,9 @@ const Diary = () => {
         const data = doc.data();
         const entryDate = parseFirestoreDate(data.date);
         const entryData: DiaryEntry = {
+          ...data,
           id: doc.id,
           date: entryDate,
-          gratitude: data.gratitude || '',
-          affirmation: data.affirmation || '',
-          notes: data.notes || '',
-          userId: data.userId,
-          createdAt: data.createdAt,
-          updatedAt: data.updatedAt,
         };
         const dateKey = entryDate.toDateString();
         entries.set(dateKey, entryData);
@@ -122,20 +117,28 @@ const Diary = () => {
     return () => unsubscribe();
   }, [user]);
 
-  // Reset form when selected date changes
+  // Load entry when selected date changes
   useEffect(() => {
-    if (selectedDate) {
-      resetForm();
+    if (selectedDate && user) {
+      loadEntryForDate(selectedDate);
     }
-  }, [selectedDate]);
+  }, [selectedDate, entriesMap]);
 
-  const resetForm = () => {
-    setEntry({
-      gratitude: "",
-      affirmation: "",
-      notes: "",
-    });
-    setExistingEntryId(null);
+  const loadEntryForDate = async (date: Date) => {
+    const dateKey = date.toDateString();
+    const existingEntry = entriesMap.get(dateKey);
+
+    if (existingEntry) {
+      setEntry({
+        gratitude: existingEntry.gratitude || "",
+        affirmation: existingEntry.affirmation || "",
+        notes: existingEntry.notes || "",
+      });
+      setExistingEntryId(existingEntry.id || null);
+    } else {
+      setEntry({ gratitude: "", affirmation: "", notes: "" });
+      setExistingEntryId(null);
+    }
   };
 
   const handleSave = async () => {
@@ -178,7 +181,6 @@ const Diary = () => {
       }
 
       await updateStreak(user.uid);
-      resetForm();
     } catch (error) {
       console.error("Error saving entry:", error);
       toast.error("Failed to save entry");
@@ -190,6 +192,22 @@ const Diary = () => {
   const handleRecentEntryClick = (diaryEntry: DiaryEntry) => {
     setSelectedEntry(diaryEntry);
     setShowRecent(false);
+  };
+
+  const handleEditEntry = () => {
+    if (!selectedEntry) return;
+
+    const entryDate = parseFirestoreDate(selectedEntry.date);
+    setSelectedDate(entryDate);
+    setSelectedEntry(null);
+
+    // Update the entry form with the selected entry's data
+    setEntry({
+      gratitude: selectedEntry.gratitude || "",
+      affirmation: selectedEntry.affirmation || "",
+      notes: selectedEntry.notes || "",
+    });
+    setExistingEntryId(selectedEntry.id || null);
   };
 
   const getDaysInMonth = (date: Date) => {
@@ -342,17 +360,16 @@ const Diary = () => {
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
                 <span>
-                  New Entry for{" "}
+                  Entry for{" "}
                   {selectedDate.toLocaleDateString("en-US", {
                     weekday: "long",
                     month: "long",
                     day: "numeric",
-                    year: "numeric",
                   })}
                 </span>
-                {hasEntry(selectedDate) && (
+                {existingEntryId && (
                   <span className="text-sm font-normal text-muted-foreground">
-                    • You have an existing entry for this date
+                    • Existing entry
                   </span>
                 )}
               </CardTitle>
@@ -404,7 +421,11 @@ const Diary = () => {
                     !entry.notes.trim())
                 }
               >
-                {loading ? "Saving..." : "Save Entry"}
+                {loading
+                  ? "Saving..."
+                  : existingEntryId
+                  ? "Update Entry"
+                  : "Save Entry"}
               </Button>
             </CardContent>
           </Card>
@@ -473,17 +494,22 @@ const Diary = () => {
         >
           <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>
-                {selectedEntry &&
-                  parseFirestoreDate(selectedEntry.date).toLocaleDateString(
-                    "en-US",
-                    {
-                      weekday: "long",
-                      month: "long",
-                      day: "numeric",
-                      year: "numeric",
-                    }
-                  )}
+              <DialogTitle className="flex items-center justify-between">
+                <span>
+                  {selectedEntry &&
+                    parseFirestoreDate(selectedEntry.date).toLocaleDateString(
+                      "en-US",
+                      {
+                        weekday: "long",
+                        month: "long",
+                        day: "numeric",
+                        year: "numeric",
+                      }
+                    )}
+                </span>
+                <Button variant="outline" size="sm" onClick={handleEditEntry}>
+                  Edit Entry
+                </Button>
               </DialogTitle>
             </DialogHeader>
             {selectedEntry && (
