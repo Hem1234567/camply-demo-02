@@ -24,7 +24,19 @@ const Login = () => {
       toast.success("Welcome back!");
       navigate("/");
     } catch (error: any) {
-      toast.error(error.message || "Failed to sign in");
+      let errorMessage = "Failed to sign in";
+      
+      if (error.code === "auth/invalid-credential" || error.code === "auth/wrong-password") {
+        errorMessage = "Invalid email or password. Please check your credentials.";
+      } else if (error.code === "auth/user-not-found") {
+        errorMessage = "No account found with this email. Please sign up first.";
+      } else if (error.code === "auth/too-many-requests") {
+        errorMessage = "Too many failed attempts. Please try again later.";
+      } else if (error.code === "auth/invalid-email") {
+        errorMessage = "Invalid email format.";
+      }
+      
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }

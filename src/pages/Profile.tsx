@@ -1,16 +1,20 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { doc, onSnapshot } from "firebase/firestore";
+import { doc, onSnapshot, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
-import { Settings as SettingsIcon, LogOut } from "lucide-react";
+import { Settings as SettingsIcon, LogOut, Edit2, Save, X } from "lucide-react";
 import { BADGES } from "@/utils/gamification";
 import Layout from "@/components/Layout";
 import { xpForNextLevel } from "@/utils/gamification";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import ImageUpload from "@/components/ImageUpload";
+import { toast } from "sonner";
 
 interface UserData {
   displayName: string;
@@ -23,11 +27,17 @@ interface UserData {
   createdAt: any;
 }
 
+const DEFAULT_AVATAR = "https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_640.png";
+
 const Profile = () => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const [userData, setUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     if (!user) {
@@ -60,6 +70,59 @@ const Profile = () => {
   const handleLogout = async () => {
     await signOut();
     navigate("/welcome");
+  };
+
+  const handleEditProfile = () => {
+    setEditName(userData?.displayName || user?.displayName || "");
+    setSelectedImage(null);
+    setIsEditDialogOpen(true);
+  };
+
+  const uploadToCloudinary = async (file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("upload_preset", "ml_default");
+
+    const response = await fetch(
+      "https://api.cloudinary.com/v1_1/dwu0wiz2g/image/upload",
+      {
+        method: "POST",
+        body: formData,
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error("Failed to upload image");
+    }
+
+    const data = await response.json();
+    return data.secure_url;
+  };
+
+  const handleSaveProfile = async () => {
+    if (!user) return;
+
+    setUploading(true);
+    try {
+      let photoURL = userData?.photoURL || DEFAULT_AVATAR;
+
+      if (selectedImage) {
+        photoURL = await uploadToCloudinary(selectedImage);
+      }
+
+      await updateDoc(doc(db, "users", user.uid), {
+        displayName: editName,
+        photoURL: photoURL,
+      });
+
+      toast.success("Profile updated successfully!");
+      setIsEditDialogOpen(false);
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      toast.error("Failed to update profile");
+    } finally {
+      setUploading(false);
+    }
   };
 
   // Calculate member days safely
@@ -114,14 +177,24 @@ const Profile = () => {
         <Card>
           <CardContent className="pt-6">
             <div className="flex flex-col items-center text-center space-y-4">
-              <Avatar className="h-24 w-24">
-                <AvatarImage src={userData?.photoURL || user?.photoURL} />
-                <AvatarFallback className="text-2xl">
-                  {(userData?.displayName ||
-                    user?.displayName ||
-                    "U")[0].toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
+              <div className="relative">
+                <Avatar className="h-24 w-24">
+                  <AvatarImage src={userData?.photoURL || user?.photoURL || DEFAULT_AVATAR} />
+                  <AvatarFallback className="text-2xl">
+                    {(userData?.displayName ||
+                      user?.displayName ||
+                      "U")[0].toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <Button
+                  size="icon"
+                  variant="secondary"
+                  className="absolute bottom-0 right-0 rounded-full h-8 w-8"
+                  onClick={handleEditProfile}
+                >
+                  <Edit2 className="h-4 w-4" />
+                </Button>
+              </div>
 
               <div>
                 <h2 className="text-2xl font-bold">
@@ -216,9 +289,57 @@ const Profile = () => {
             Logout
           </Button>
         </div>
+
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Edit Profile</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-6 py-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Display Name</label>
+                <Input
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  placeholder="Enter your name"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Profile Picture</label>
+                <ImageUpload
+                  currentImage={userData?.photoURL || user?.photoURL || DEFAULT_AVATAR}
+                  onImageSelect={(file) => setSelectedImage(file)}
+                  onImageRemove={() => setSelectedImage(null)}
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => setIsEditDialogOpen(false)}
+                  disabled={uploading}
+                >
+                  <X className="mr-2 h-4 w-4" />
+                  Cancel
+                </Button>
+                <Button
+                  className="flex-1"
+                  onClick={handleSaveProfile}
+                  disabled={uploading}
+                >
+                  <Save className="mr-2 h-4 w-4" />
+                  {uploading ? "Saving..." : "Save"}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </Layout>
   );
 };
 
 export default Profile;
+
