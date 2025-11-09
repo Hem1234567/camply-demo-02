@@ -1,4 +1,4 @@
-import { Home, CheckSquare, Calendar, Trophy, Target, User } from "lucide-react";
+import { Home, Calendar, Trophy, Target, User } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
@@ -8,7 +8,6 @@ const BottomNav = () => {
 
   const navItems = [
     { icon: Home, label: "Home", path: "/" },
-    { icon: CheckSquare, label: "Tasks", path: "/tasks" },
     { icon: Calendar, label: "Diary", path: "/diary" },
     { icon: Trophy, label: "Leaderboard", path: "/leaderboard" },
     { icon: Target, label: "Goals", path: "/weekly-goals" },

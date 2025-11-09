@@ -22,7 +22,13 @@ const Login = () => {
     try {
       await signInWithEmailAndPassword(auth, email, password);
       toast.success("Welcome back!");
-      navigate("/");
+      
+      // Redirect admin to admin panel, others to home
+      if (email === "admin@gmail.com") {
+        navigate("/admin-panel");
+      } else {
+        navigate("/");
+      }
     } catch (error: any) {
       let errorMessage = "Failed to sign in";
       
@@ -45,9 +51,15 @@ const Login = () => {
   const handleGoogleLogin = async () => {
     setLoading(true);
     try {
-      await signInWithPopup(auth, googleProvider);
+      const result = await signInWithPopup(auth, googleProvider);
       toast.success("Welcome back!");
-      navigate("/");
+      
+      // Redirect admin to admin panel, others to home
+      if (result.user.email === "admin@gmail.com") {
+        navigate("/admin-panel");
+      } else {
+        navigate("/");
+      }
     } catch (error: any) {
       toast.error(error.message || "Failed to sign in with Google");
     } finally {
