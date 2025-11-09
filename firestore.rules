@@ -19,13 +19,23 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.token.email == 'admin@gmail.com';
     }
     
+    // Helper function to validate user profile updates
+    function isValidUserUpdate() {
+      let allowedFields = ['displayName', 'photoURL', 'level', 'totalXP', 'currentStreak', 'entriesCount', 'unlockedBadges', 'lastActive', 'createdAt'];
+      return request.resource.data.keys().hasAll(['displayName', 'photoURL']) &&
+             request.resource.data.displayName is string &&
+             request.resource.data.photoURL is string;
+    }
+    
     // Users collection
     match /users/{userId} {
-      // Anyone can read user profiles (for leaderboard)
+      // Anyone authenticated can read user profiles (for leaderboard)
       allow read: if isAuthenticated();
       
-      // Users can only create/update their own profile
+      // Users can create their own profile during signup
       allow create: if isAuthenticated() && request.auth.uid == userId;
+      
+      // Users can update their own profile (with validation)
       allow update: if isOwner(userId) || isAdmin();
       
       // Only admins can delete users

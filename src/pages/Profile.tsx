@@ -79,24 +79,32 @@ const Profile = () => {
   };
 
   const uploadToCloudinary = async (file: File): Promise<string> => {
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("upload_preset", "ml_default");
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("upload_preset", "unsigned_preset");
+      formData.append("folder", "profile_pictures");
 
-    const response = await fetch(
-      "https://api.cloudinary.com/v1_1/dwu0wiz2g/image/upload",
-      {
-        method: "POST",
-        body: formData,
+      const response = await fetch(
+        "https://api.cloudinary.com/v1_1/dwu0wiz2g/image/upload",
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        console.error("Cloudinary error:", data);
+        throw new Error(data.error?.message || "Failed to upload image");
       }
-    );
 
-    if (!response.ok) {
-      throw new Error("Failed to upload image");
+      return data.secure_url;
+    } catch (error: any) {
+      console.error("Upload error:", error);
+      throw new Error(error.message || "Failed to upload image to Cloudinary");
     }
-
-    const data = await response.json();
-    return data.secure_url;
   };
 
   const handleSaveProfile = async () => {
@@ -106,20 +114,37 @@ const Profile = () => {
     try {
       let photoURL = userData?.photoURL || DEFAULT_AVATAR;
 
+      // Only upload if user selected a new image
       if (selectedImage) {
-        photoURL = await uploadToCloudinary(selectedImage);
+        try {
+          photoURL = await uploadToCloudinary(selectedImage);
+          toast.success("Image uploaded successfully!");
+        } catch (uploadError: any) {
+          console.error("Upload error:", uploadError);
+          toast.error("Image upload failed. Please check Cloudinary settings or try a smaller image.");
+          setUploading(false);
+          return;
+        }
       }
 
+      // Update Firestore
       await updateDoc(doc(db, "users", user.uid), {
-        displayName: editName,
+        displayName: editName.trim() || userData?.displayName || "User",
         photoURL: photoURL,
       });
 
       toast.success("Profile updated successfully!");
       setIsEditDialogOpen(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating profile:", error);
-      toast.error("Failed to update profile");
+      
+      if (error.code === "permission-denied") {
+        toast.error("Permission denied. Please check your authentication.");
+      } else if (error.code === "not-found") {
+        toast.error("User profile not found. Please try logging in again.");
+      } else {
+        toast.error(error.message || "Failed to update profile");
+      }
     } finally {
       setUploading(false);
     }
