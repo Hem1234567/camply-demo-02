@@ -5,10 +5,13 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { useState, useEffect } from "react";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "./lib/firebase";
 import Welcome from "./pages/Welcome";
 import Login from "./pages/Login";
 import SignUp from "./pages/SignUp";
-import Permissions from "./pages/Permissions";
+import Onboarding from "./pages/Onboarding";
 import Home from "./pages/Home";
 import Tasks from "./pages/Tasks";
 import Diary from "./pages/Diary";
@@ -24,8 +27,19 @@ const queryClient = new QueryClient();
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
+  const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState<boolean | null>(null);
   
-  if (loading) {
+  useEffect(() => {
+    if (user) {
+      const checkOnboarding = async () => {
+        const userDoc = await getDoc(doc(db, "users", user.uid));
+        setHasCompletedOnboarding(userDoc.exists() ? userDoc.data()?.hasCompletedOnboarding ?? false : false);
+      };
+      checkOnboarding();
+    }
+  }, [user]);
+  
+  if (loading || (user && hasCompletedOnboarding === null)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
@@ -33,7 +47,10 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     );
   }
   
-  return user ? <>{children}</> : <Navigate to="/welcome" />;
+  if (!user) return <Navigate to="/welcome" />;
+  if (!hasCompletedOnboarding) return <Navigate to="/onboarding" />;
+  
+  return <>{children}</>;
 };
 
 const PublicRoute = ({ children }: { children: React.ReactNode }) => {
@@ -62,7 +79,7 @@ const App = () => (
               <Route path="/welcome" element={<PublicRoute><Welcome /></PublicRoute>} />
               <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
               <Route path="/signup" element={<PublicRoute><SignUp /></PublicRoute>} />
-              <Route path="/permissions" element={<Permissions />} />
+              <Route path="/onboarding" element={<Onboarding />} />
               <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
               <Route path="/tasks" element={<ProtectedRoute><Tasks /></ProtectedRoute>} />
               <Route path="/diary" element={<ProtectedRoute><Diary /></ProtectedRoute>} />
