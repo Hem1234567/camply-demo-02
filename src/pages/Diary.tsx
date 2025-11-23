@@ -172,8 +172,8 @@ const Diary = () => {
       if (existingEntryId) {
         // Update existing entry
         await setDoc(doc(db, "diaryEntries", existingEntryId), entryData);
-        toast.success("Entry updated! +5 XP");
-        await awardXP(user.uid, 5);
+        toast.success("Entry updated! +2 XP");
+        await awardXP(user.uid, 2);
       } else {
         // Create new entry
         const docRef = doc(db, "diaryEntries", `${user.uid}_${dateStr}`);
@@ -181,8 +181,8 @@ const Diary = () => {
           ...entryData,
           createdAt: serverTimestamp(),
         });
-        toast.success("Entry saved! +10 XP");
-        await awardXP(user.uid, 10);
+        toast.success("Entry saved! +5 XP");
+        await awardXP(user.uid, 5);
       }
 
       await updateStreak(user.uid);

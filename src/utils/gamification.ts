@@ -3,6 +3,13 @@ import { db } from '@/lib/firebase';
 
 export const BADGES = [
   {
+    id: 'getting_started',
+    name: 'Getting Started',
+    description: 'Complete the onboarding journey',
+    icon: '🌟',
+    criteria: { type: 'onboarding', threshold: 1 }
+  },
+  {
     id: 'first_entry',
     name: 'Newbie',
     description: 'Complete your first journal entry',
