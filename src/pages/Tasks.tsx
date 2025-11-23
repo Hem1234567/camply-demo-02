@@ -108,12 +108,12 @@ const Tasks = () => {
       })),
       completed: true,
       completedAt: new Date().toISOString(),
-      xpEarned: 50
+      xpEarned: 15
     };
 
     try {
       await setDoc(doc(collection(db, 'dailyTasks')), taskData);
-      await awardXP(user.uid, 50);
+      await awardXP(user.uid, 15);
       await updateStreak(user.uid);
       await checkAndAwardBadge(user.uid, 'first_entry');
       

@@ -83,7 +83,7 @@ const WeeklyGoals = () => {
       });
 
       if (newCompleted) {
-        await awardXP(user.uid, 30);
+        await awardXP(user.uid, 10);
         
         const completedCount = goals.filter(g => g.completed).length + 1;
         if (completedCount >= 3) {

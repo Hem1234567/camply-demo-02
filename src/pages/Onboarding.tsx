@@ -4,13 +4,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { doc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { toast } from "sonner";
-import { Sparkles } from "lucide-react";
-import { awardXP } from "@/utils/gamification";
+import { Sparkles, ChevronLeft, TrendingUp } from "lucide-react";
+import { awardXP, checkAndAwardBadge, BADGES } from "@/utils/gamification";
+import OnboardingCelebration from "@/components/OnboardingCelebration";
 
 const ONBOARDING_QUESTIONS = [
   {
@@ -18,28 +20,28 @@ const ONBOARDING_QUESTIONS = [
     question: "What should we call you?",
     placeholder: "Enter your name",
     type: "input" as const,
-    xp: 10,
+    xp: 2,
   },
   {
     id: "goals",
     question: "What are your main goals for personal growth?",
     placeholder: "e.g., Build better habits, track progress, stay motivated...",
     type: "textarea" as const,
-    xp: 15,
+    xp: 3,
   },
   {
     id: "motivation",
     question: "What motivates you to journal daily?",
     placeholder: "Share your motivation...",
     type: "textarea" as const,
-    xp: 15,
+    xp: 3,
   },
   {
     id: "expectations",
     question: "What do you hope to achieve in the next 30 days?",
     placeholder: "Your 30-day vision...",
     type: "textarea" as const,
-    xp: 20,
+    xp: 4,
   },
 ];
 
@@ -49,9 +51,14 @@ const Onboarding = () => {
   const [currentStep, setCurrentStep] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
+  const [showCelebration, setShowCelebration] = useState(false);
 
   const currentQuestion = ONBOARDING_QUESTIONS[currentStep];
   const totalXP = ONBOARDING_QUESTIONS.reduce((sum, q) => sum + q.xp, 0);
+  const earnedXP = ONBOARDING_QUESTIONS.slice(0, currentStep)
+    .filter(q => answers[q.id]?.trim())
+    .reduce((sum, q) => sum + q.xp, 0);
+  const progressPercentage = (currentStep / ONBOARDING_QUESTIONS.length) * 100;
 
   const handleNext = async () => {
     const answer = answers[currentQuestion.id]?.trim();
@@ -86,15 +93,28 @@ const Onboarding = () => {
 
       // Award total XP for completing onboarding
       await awardXP(user.uid, totalXP);
+      
+      // Award the Getting Started badge
+      await checkAndAwardBadge(user.uid, 'getting_started');
 
-      toast.success(`Welcome aboard! You've earned ${totalXP} XP! 🎉`);
-      navigate("/");
+      // Show celebration screen
+      setShowCelebration(true);
     } catch (error) {
       console.error("Error completing onboarding:", error);
       toast.error("Failed to complete onboarding");
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleBack = () => {
+    if (currentStep > 0) {
+      setCurrentStep(currentStep - 1);
+    }
+  };
+
+  const handleCelebrationContinue = () => {
+    navigate("/");
   };
 
   const handleSkip = async () => {
@@ -120,6 +140,18 @@ const Onboarding = () => {
     }
   };
 
+  if (showCelebration) {
+    const badge = BADGES.find(b => b.id === 'getting_started')!;
+    return (
+      <OnboardingCelebration
+        name={answers.name || "User"}
+        totalXP={totalXP}
+        badge={badge}
+        onContinue={handleCelebrationContinue}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-6">
       <Card className="max-w-2xl w-full">
@@ -134,8 +166,20 @@ const Onboarding = () => {
             </span>
           </div>
           <p className="text-muted-foreground mt-2">
-            Answer a few questions to get started and earn {totalXP} XP!
+            Answer questions to get started and earn {totalXP} XP!
           </p>
+          
+          {/* Progress Bar */}
+          <div className="mt-4 space-y-2">
+            <Progress value={progressPercentage} className="h-2" />
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>Progress: {Math.round(progressPercentage)}%</span>
+              <span className="flex items-center gap-1">
+                <TrendingUp className="h-3 w-3" />
+                {earnedXP} / {totalXP} XP
+              </span>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-4">
@@ -170,6 +214,16 @@ const Onboarding = () => {
           </div>
 
           <div className="flex gap-3">
+            {currentStep > 0 && (
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handleBack}
+                disabled={loading}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+            )}
             <Button
               variant="outline"
               className="flex-1"
