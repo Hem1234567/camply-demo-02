@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useNavigate } from "react-router-dom";
-import { createUserWithEmailAndPassword, signInWithPopup, updateProfile } from "firebase/auth";
+import { createUserWithEmailAndPassword, signInWithPopup, updateProfile, signOut } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
 import { auth, db, googleProvider } from "@/lib/firebase";
 import { toast } from "sonner";
@@ -30,6 +30,7 @@ const SignUp = () => {
       unlockedBadges: [],
       entriesCount: 0,
       themePreference: "light",
+      hasCompletedOnboarding: false,
       lastActive: new Date().toISOString(),
       createdAt: new Date().toISOString(),
     });
@@ -43,9 +44,10 @@ const SignUp = () => {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       await updateProfile(userCredential.user, { displayName: name });
       await createUserProfile(userCredential.user.uid, name, email);
+      await signOut(auth);
       
-      toast.success("Account created successfully!");
-      navigate("/permissions");
+      toast.success("Account created! Please login to continue.");
+      navigate("/login");
     } catch (error: any) {
       if (error.code === "auth/email-already-in-use") {
         toast.error("Email already in use");
@@ -66,9 +68,10 @@ const SignUp = () => {
         result.user.displayName || "User",
         result.user.email || ""
       );
+      await signOut(auth);
       
-      toast.success("Account created successfully!");
-      navigate("/permissions");
+      toast.success("Account created! Please login to continue.");
+      navigate("/login");
     } catch (error: any) {
       toast.error(error.message || "Failed to sign up with Google");
     } finally {
