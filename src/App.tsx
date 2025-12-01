@@ -35,30 +35,39 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   
   useEffect(() => {
     if (user) {
-      const checkOnboarding = async () => {
-        const userDoc = await getDoc(doc(db, "users", user.uid));
-        const userData = userDoc.data();
-        
-        // For existing users who don't have the field, assume they've completed onboarding
-        const completed = userData?.hasCompletedOnboarding !== false;
-        setHasCompletedOnboarding(completed);
-        
-        // Check daily bonus only once per session for users who completed onboarding
-        if (completed && !dailyBonusChecked) {
-          setDailyBonusChecked(true);
-          const bonusXP = await checkDailyBonus(user.uid);
-          if (bonusXP > 0) {
-            setTimeout(() => {
-              playDailyBonusSound();
-              triggerDailyBonusConfetti();
-              toast.success(`Daily Login Bonus! +${bonusXP} XP 🎉`, {
-                description: "Come back tomorrow for another bonus!"
-              });
-            }, 1000);
-          }
+      // Reload user to get latest email verification status
+      user.reload().then(() => {
+        // Check if email is verified (skip for admin and Google users)
+        if (user.email !== "admin@gmail.com" && !user.emailVerified && user.providerData[0]?.providerId === "password") {
+          toast.error("Please verify your email to access the app");
+          return;
         }
-      };
-      checkOnboarding();
+        
+        const checkOnboarding = async () => {
+          const userDoc = await getDoc(doc(db, "users", user.uid));
+          const userData = userDoc.data();
+          
+          // For existing users who don't have the field, assume they've completed onboarding
+          const completed = userData?.hasCompletedOnboarding !== false;
+          setHasCompletedOnboarding(completed);
+          
+          // Check daily bonus only once per session for users who completed onboarding
+          if (completed && !dailyBonusChecked) {
+            setDailyBonusChecked(true);
+            const bonusXP = await checkDailyBonus(user.uid);
+            if (bonusXP > 0) {
+              setTimeout(() => {
+                playDailyBonusSound();
+                triggerDailyBonusConfetti();
+                toast.success(`Daily Login Bonus! +${bonusXP} XP 🎉`, {
+                  description: "Come back tomorrow for another bonus!"
+                });
+              }, 1000);
+            }
+          }
+        };
+        checkOnboarding();
+      });
     } else {
       setDailyBonusChecked(false);
     }
@@ -73,6 +82,12 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   }
   
   if (!user) return <Navigate to="/welcome" />;
+  
+  // Check email verification (skip for admin and Google users)
+  if (user.email !== "admin@gmail.com" && !user.emailVerified && user.providerData[0]?.providerId === "password") {
+    return <Navigate to="/login" />;
+  }
+  
   if (!hasCompletedOnboarding) return <Navigate to="/onboarding" />;
   
   return <>{children}</>;
