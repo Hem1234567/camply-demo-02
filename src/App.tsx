@@ -8,6 +8,9 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import { useState, useEffect } from "react";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "./lib/firebase";
+import { checkDailyBonus } from "./utils/gamification";
+import { playDailyBonusSound, triggerDailyBonusConfetti } from "./utils/celebrationEffects";
+import { toast } from "sonner";
 import Welcome from "./pages/Welcome";
 import Login from "./pages/Login";
 import SignUp from "./pages/SignUp";
@@ -28,16 +31,38 @@ const queryClient = new QueryClient();
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState<boolean | null>(null);
+  const [dailyBonusChecked, setDailyBonusChecked] = useState(false);
   
   useEffect(() => {
     if (user) {
       const checkOnboarding = async () => {
         const userDoc = await getDoc(doc(db, "users", user.uid));
-        setHasCompletedOnboarding(userDoc.exists() ? userDoc.data()?.hasCompletedOnboarding ?? false : false);
+        const userData = userDoc.data();
+        
+        // For existing users who don't have the field, assume they've completed onboarding
+        const completed = userData?.hasCompletedOnboarding !== false;
+        setHasCompletedOnboarding(completed);
+        
+        // Check daily bonus only once per session for users who completed onboarding
+        if (completed && !dailyBonusChecked) {
+          setDailyBonusChecked(true);
+          const bonusXP = await checkDailyBonus(user.uid);
+          if (bonusXP > 0) {
+            setTimeout(() => {
+              playDailyBonusSound();
+              triggerDailyBonusConfetti();
+              toast.success(`Daily Login Bonus! +${bonusXP} XP 🎉`, {
+                description: "Come back tomorrow for another bonus!"
+              });
+            }, 1000);
+          }
+        }
       };
       checkOnboarding();
+    } else {
+      setDailyBonusChecked(false);
     }
-  }, [user]);
+  }, [user, dailyBonusChecked]);
   
   if (loading || (user && hasCompletedOnboarding === null)) {
     return (

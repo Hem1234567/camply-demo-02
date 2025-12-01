@@ -64,10 +64,57 @@ export const awardXP = async (userId: string, xpAmount: number) => {
   const userDoc = await getDoc(userRef);
   const userData = userDoc.data();
   const newLevel = calculateLevel(userData?.totalXP || 0);
+  const oldLevel = userData?.level || 1;
   
-  if (newLevel > (userData?.level || 1)) {
+  if (newLevel > oldLevel) {
     await updateDoc(userRef, { level: newLevel });
+    return { levelUp: true, newLevel, oldLevel };
   }
+  
+  return { levelUp: false, newLevel: oldLevel, oldLevel };
+};
+
+export const checkDailyBonus = async (userId: string): Promise<number> => {
+  const userRef = doc(db, 'users', userId);
+  const userDoc = await getDoc(userRef);
+  const userData = userDoc.data();
+  
+  const lastLogin = userData?.lastLoginDate ? new Date(userData.lastLoginDate) : null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  let lastLoginDate: Date | null = null;
+  if (lastLogin) {
+    lastLoginDate = new Date(lastLogin);
+    lastLoginDate.setHours(0, 0, 0, 0);
+  }
+  
+  const daysDiff = lastLoginDate 
+    ? Math.floor((today.getTime() - lastLoginDate.getTime()) / (1000 * 60 * 60 * 24)) 
+    : -1;
+  
+  // Award bonus if it's a new day
+  if (daysDiff !== 0) {
+    const bonusXP = 5;
+    await updateDoc(userRef, {
+      totalXP: increment(bonusXP),
+      lastLoginDate: new Date().toISOString()
+    });
+    
+    // Check for level up after bonus
+    const updatedDoc = await getDoc(userRef);
+    const updatedData = updatedDoc.data();
+    const newLevel = calculateLevel(updatedData?.totalXP || 0);
+    const oldLevel = updatedData?.level || 1;
+    
+    if (newLevel > oldLevel) {
+      await updateDoc(userRef, { level: newLevel });
+    }
+    
+    return bonusXP;
+  }
+  
+  return 0;
 };
 
 export const checkAndAwardBadge = async (userId: string, badgeId: string) => {
