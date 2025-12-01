@@ -46,8 +46,11 @@ const SignUp = () => {
       await createUserProfile(userCredential.user.uid, name, email);
       await signOut(auth);
       
-      toast.success("Account created! Please login to continue.");
-      navigate("/login");
+      // Wait for auth state to propagate before navigating
+      setTimeout(() => {
+        toast.success("Account created! Please login to continue.");
+        navigate("/login", { replace: true });
+      }, 300);
     } catch (error: any) {
       if (error.code === "auth/email-already-in-use") {
         toast.error("Email already in use");
@@ -70,8 +73,11 @@ const SignUp = () => {
       );
       await signOut(auth);
       
-      toast.success("Account created! Please login to continue.");
-      navigate("/login");
+      // Wait for auth state to propagate before navigating
+      setTimeout(() => {
+        toast.success("Account created! Please login to continue.");
+        navigate("/login", { replace: true });
+      }, 300);
     } catch (error: any) {
       toast.error(error.message || "Failed to sign up with Google");
     } finally {
