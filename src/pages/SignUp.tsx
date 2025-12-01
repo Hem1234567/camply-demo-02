@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useNavigate } from "react-router-dom";
-import { createUserWithEmailAndPassword, signInWithPopup, updateProfile, signOut } from "firebase/auth";
+import { createUserWithEmailAndPassword, signInWithPopup, updateProfile, signOut, sendEmailVerification } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
 import { auth, db, googleProvider } from "@/lib/firebase";
 import { toast } from "sonner";
@@ -44,13 +44,17 @@ const SignUp = () => {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       await updateProfile(userCredential.user, { displayName: name });
       await createUserProfile(userCredential.user.uid, name, email);
+      
+      // Send email verification
+      await sendEmailVerification(userCredential.user);
+      
+      // Sign out immediately to prevent auth state flash
       await signOut(auth);
       
-      // Wait for auth state to propagate before navigating
-      setTimeout(() => {
-        toast.success("Account created! Please login to continue.");
-        navigate("/login", { replace: true });
-      }, 300);
+      toast.success("Account created! Please check your email to verify your account.", {
+        duration: 5000
+      });
+      navigate("/login", { replace: true });
     } catch (error: any) {
       if (error.code === "auth/email-already-in-use") {
         toast.error("Email already in use");
@@ -66,18 +70,27 @@ const SignUp = () => {
     setLoading(true);
     try {
       const result = await signInWithPopup(auth, googleProvider);
+      
+      // Check if user already exists
+      const existingUser = result.user;
+      if (!existingUser.metadata.creationTime || existingUser.metadata.creationTime !== existingUser.metadata.lastSignInTime) {
+        await signOut(auth);
+        toast.error("Account already exists. Please login.");
+        navigate("/login", { replace: true });
+        return;
+      }
+      
       await createUserProfile(
         result.user.uid,
         result.user.displayName || "User",
         result.user.email || ""
       );
+      
+      // Sign out immediately to prevent auth state flash
       await signOut(auth);
       
-      // Wait for auth state to propagate before navigating
-      setTimeout(() => {
-        toast.success("Account created! Please login to continue.");
-        navigate("/login", { replace: true });
-      }, 300);
+      toast.success("Account created! Please login to continue.");
+      navigate("/login", { replace: true });
     } catch (error: any) {
       toast.error(error.message || "Failed to sign up with Google");
     } finally {
