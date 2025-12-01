@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useNavigate } from "react-router-dom";
-import { signInWithEmailAndPassword, signInWithPopup } from "firebase/auth";
+import { signInWithEmailAndPassword, signInWithPopup, sendEmailVerification } from "firebase/auth";
 import { auth, googleProvider } from "@/lib/firebase";
 import { toast } from "sonner";
 import { Eye, EyeOff } from "lucide-react";
@@ -20,7 +20,30 @@ const Login = () => {
     setLoading(true);
     
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      
+      // Check if email is verified (skip for admin)
+      if (email !== "admin@gmail.com" && !userCredential.user.emailVerified) {
+        toast.error("Please verify your email before logging in.", {
+          description: "Check your inbox for the verification link.",
+          action: {
+            label: "Resend",
+            onClick: async () => {
+              try {
+                await sendEmailVerification(userCredential.user);
+                toast.success("Verification email sent!");
+              } catch (error) {
+                toast.error("Failed to resend verification email");
+              }
+            }
+          },
+          duration: 10000
+        });
+        await auth.signOut();
+        setLoading(false);
+        return;
+      }
+      
       toast.success("Welcome back!");
       
       // Redirect admin to admin panel, others to home
@@ -52,6 +75,8 @@ const Login = () => {
     setLoading(true);
     try {
       const result = await signInWithPopup(auth, googleProvider);
+      
+      // Google accounts are already verified
       toast.success("Welcome back!");
       
       // Redirect admin to admin panel, others to home
