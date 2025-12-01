@@ -10,6 +10,7 @@ import { Progress } from "@/components/ui/progress";
 import { Mic, MicOff, ChevronRight, ChevronLeft } from "lucide-react";
 import { VoiceRecognition } from "@/utils/voiceRecognition";
 import { awardXP, updateStreak, checkAndAwardBadge } from "@/utils/gamification";
+import { playXPSound, triggerXPConfetti } from "@/utils/celebrationEffects";
 import { toast } from "sonner";
 import Layout from "@/components/Layout";
 
@@ -114,6 +115,8 @@ const Tasks = () => {
     try {
       await setDoc(doc(collection(db, 'dailyTasks')), taskData);
       await awardXP(user.uid, 15);
+      playXPSound();
+      triggerXPConfetti();
       await updateStreak(user.uid);
       await checkAndAwardBadge(user.uid, 'first_entry');
       
@@ -121,7 +124,7 @@ const Tasks = () => {
       const entriesCount = userDoc.data()?.entriesCount || 0;
       await setDoc(doc(db, 'users', user.uid), { entriesCount: entriesCount + 1 }, { merge: true });
 
-      toast.success("Task completed! +50 XP");
+      toast.success("Task completed! +15 XP");
       navigate("/");
     } catch (error) {
       console.error("Error completing task:", error);

@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { Sparkles, ChevronLeft, TrendingUp } from "lucide-react";
 import { awardXP, checkAndAwardBadge, BADGES } from "@/utils/gamification";
 import OnboardingCelebration from "@/components/OnboardingCelebration";
+import { playXPSound, playBadgeSound, triggerBadgeConfetti } from "@/utils/celebrationEffects";
 
 const ONBOARDING_QUESTIONS = [
   {
@@ -92,13 +93,23 @@ const Onboarding = () => {
       );
 
       // Award total XP for completing onboarding
-      await awardXP(user.uid, totalXP);
+      const xpResult = await awardXP(user.uid, totalXP);
+      playXPSound();
       
       // Award the Getting Started badge
-      await checkAndAwardBadge(user.uid, 'getting_started');
+      const badgeAwarded = await checkAndAwardBadge(user.uid, 'getting_started');
+      
+      if (badgeAwarded) {
+        setTimeout(() => {
+          playBadgeSound();
+          triggerBadgeConfetti();
+        }, 300);
+      }
 
       // Show celebration screen
-      setShowCelebration(true);
+      setTimeout(() => {
+        setShowCelebration(true);
+      }, 800);
     } catch (error) {
       console.error("Error completing onboarding:", error);
       toast.error("Failed to complete onboarding");

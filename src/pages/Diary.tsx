@@ -32,7 +32,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import Layout from "@/components/Layout";
-import { awardXP, updateStreak } from "@/utils/gamification";
+import { awardXP, updateStreak, checkAndAwardBadge } from "@/utils/gamification";
+import { playXPSound, playBadgeSound, triggerXPConfetti, triggerBadgeConfetti } from "@/utils/celebrationEffects";
 
 interface DiaryEntry {
   id?: string;
@@ -172,8 +173,10 @@ const Diary = () => {
       if (existingEntryId) {
         // Update existing entry
         await setDoc(doc(db, "diaryEntries", existingEntryId), entryData);
-        toast.success("Entry updated! +2 XP");
         await awardXP(user.uid, 2);
+        playXPSound();
+        triggerXPConfetti();
+        toast.success("Entry updated! +2 XP");
       } else {
         // Create new entry
         const docRef = doc(db, "diaryEntries", `${user.uid}_${dateStr}`);
@@ -181,11 +184,26 @@ const Diary = () => {
           ...entryData,
           createdAt: serverTimestamp(),
         });
-        toast.success("Entry saved! +5 XP");
+        
+        const newStreak = await updateStreak(user.uid);
         await awardXP(user.uid, 5);
+        playXPSound();
+        triggerXPConfetti();
+        
+        // Check for first entry badge
+        if (newStreak === 1) {
+          const badgeAwarded = await checkAndAwardBadge(user.uid, 'first_entry');
+          if (badgeAwarded) {
+            setTimeout(() => {
+              playBadgeSound();
+              triggerBadgeConfetti();
+              toast.success("🎉 Badge Unlocked: Newbie!");
+            }, 500);
+          }
+        }
+        
+        toast.success(`Entry saved! +5 XP | Streak: ${newStreak} days 🔥`);
       }
-
-      await updateStreak(user.uid);
     } catch (error) {
       console.error("Error saving entry:", error);
       toast.error("Failed to save entry");

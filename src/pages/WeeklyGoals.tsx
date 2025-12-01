@@ -10,6 +10,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import Layout from "@/components/Layout";
 import { awardXP, checkAndAwardBadge } from "@/utils/gamification";
+import { playXPSound, playBadgeSound, triggerXPConfetti, triggerBadgeConfetti } from "@/utils/celebrationEffects";
 
 interface Goal {
   id: string;
@@ -84,13 +85,21 @@ const WeeklyGoals = () => {
 
       if (newCompleted) {
         await awardXP(user.uid, 10);
+        playXPSound();
+        triggerXPConfetti();
+        toast.success("Goal completed! +10 XP");
         
-        const completedCount = goals.filter(g => g.completed).length + 1;
-        if (completedCount >= 3) {
-          await checkAndAwardBadge(user.uid, 'goal_crusher');
+        const completedGoals = goals.filter(g => g.id === goal.id || g.completed).length;
+        if (completedGoals === 3) {
+          const badgeAwarded = await checkAndAwardBadge(user.uid, 'goal_crusher');
+          if (badgeAwarded) {
+            setTimeout(() => {
+              playBadgeSound();
+              triggerBadgeConfetti();
+              toast.success('🏆 Badge Unlocked: Goal Crusher!');
+            }, 500);
+          }
         }
-        
-        toast.success("Goal completed! +30 XP");
       }
 
       fetchGoals();
