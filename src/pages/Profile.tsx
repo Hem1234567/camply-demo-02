@@ -69,7 +69,7 @@ const Profile = () => {
 
   const handleLogout = async () => {
     await signOut();
-    navigate("/welcome");
+    navigate("/login");
   };
 
   const handleEditProfile = () => {
