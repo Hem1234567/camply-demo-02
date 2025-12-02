@@ -4,7 +4,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useNavigate } from "react-router-dom";
 import { signInWithEmailAndPassword, signInWithPopup, sendEmailVerification } from "firebase/auth";
-import { auth, googleProvider } from "@/lib/firebase";
+import { auth, googleProvider, db } from "@/lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
 import { toast } from "sonner";
 import { Eye, EyeOff } from "lucide-react";
 
@@ -22,8 +23,13 @@ const Login = () => {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       
-      // Check if email is verified (skip for admin)
-      if (email !== "admin@gmail.com" && !userCredential.user.emailVerified) {
+      // Check user profile for email verification requirement
+      const userDoc = await getDoc(doc(db, "users", userCredential.user.uid));
+      const userData = userDoc.data();
+      const requiresVerification = userData?.emailVerificationEnabled === true;
+      
+      // Check if email is verified (skip for admin and users who don't require verification)
+      if (email !== "admin@gmail.com" && requiresVerification && !userCredential.user.emailVerified) {
         toast.error("Please verify your email before logging in.", {
           description: "Check your inbox for the verification link.",
           action: {

@@ -36,17 +36,19 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     if (user) {
       // Reload user to get latest email verification status
-      user.reload().then(() => {
-        // Check if email is verified (skip for admin and Google users)
-        if (user.email !== "admin@gmail.com" && !user.emailVerified && user.providerData[0]?.providerId === "password") {
+      user.reload().then(async () => {
+        // Check user profile for email verification requirement
+        const userDoc = await getDoc(doc(db, "users", user.uid));
+        const userData = userDoc.data();
+        const requiresVerification = userData?.emailVerificationEnabled === true;
+        
+        // Check if email is verified only for users who require it
+        if (user.email !== "admin@gmail.com" && requiresVerification && !user.emailVerified) {
           toast.error("Please verify your email to access the app");
           return;
         }
         
         const checkOnboarding = async () => {
-          const userDoc = await getDoc(doc(db, "users", user.uid));
-          const userData = userDoc.data();
-          
           // For existing users who don't have the field, assume they've completed onboarding
           const completed = userData?.hasCompletedOnboarding !== false;
           setHasCompletedOnboarding(completed);
@@ -82,11 +84,6 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   }
   
   if (!user) return <Navigate to="/welcome" />;
-  
-  // Check email verification (skip for admin and Google users)
-  if (user.email !== "admin@gmail.com" && !user.emailVerified && user.providerData[0]?.providerId === "password") {
-    return <Navigate to="/login" />;
-  }
   
   if (!hasCompletedOnboarding) return <Navigate to="/onboarding" />;
   

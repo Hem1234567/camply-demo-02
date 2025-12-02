@@ -11,13 +11,12 @@ import { Eye, EyeOff } from "lucide-react";
 
 const SignUp = () => {
   const navigate = useNavigate();
-  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const createUserProfile = async (userId: string, displayName: string, userEmail: string) => {
+  const createUserProfile = async (userId: string, displayName: string, userEmail: string, requiresVerification: boolean = false) => {
     await setDoc(doc(db, "users", userId), {
       userId,
       email: userEmail,
@@ -31,6 +30,7 @@ const SignUp = () => {
       entriesCount: 0,
       themePreference: "light",
       hasCompletedOnboarding: false,
+      emailVerificationEnabled: requiresVerification,
       lastActive: new Date().toISOString(),
       createdAt: new Date().toISOString(),
     });
@@ -42,8 +42,9 @@ const SignUp = () => {
     
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      await updateProfile(userCredential.user, { displayName: name });
-      await createUserProfile(userCredential.user.uid, name, email);
+      const displayName = email.split('@')[0];
+      await updateProfile(userCredential.user, { displayName });
+      await createUserProfile(userCredential.user.uid, displayName, email, true);
       
       // Send email verification
       await sendEmailVerification(userCredential.user);
@@ -80,10 +81,12 @@ const SignUp = () => {
         return;
       }
       
+      // Google users are pre-verified, no need for email verification
       await createUserProfile(
         result.user.uid,
         result.user.displayName || "User",
-        result.user.email || ""
+        result.user.email || "",
+        false
       );
       
       // Sign out immediately to prevent auth state flash
@@ -110,18 +113,6 @@ const SignUp = () => {
         </div>
 
         <form onSubmit={handleEmailSignup} className="space-y-6">
-          <div className="space-y-2">
-            <Label htmlFor="name">Full Name</Label>
-            <Input
-              id="name"
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="John Doe"
-              required
-            />
-          </div>
-
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input
