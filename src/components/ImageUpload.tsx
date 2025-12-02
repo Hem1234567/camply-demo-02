@@ -28,17 +28,26 @@ const ImageUpload = ({ currentImage, onImageSelect, onImageRemove }: ImageUpload
     setIsDragging(false);
 
     const file = e.dataTransfer.files[0];
-    if (file && file.type.startsWith("image/")) {
+    const validImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    
+    if (file && validImageTypes.includes(file.type.toLowerCase())) {
       handleFile(file);
     } else {
-      toast.error("Please upload an image file");
+      toast.error("Please upload a valid image file (JPG, PNG, GIF, or WEBP)");
     }
   };
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
+    const validImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    
+    if (file && validImageTypes.includes(file.type.toLowerCase())) {
       handleFile(file);
+    } else if (file) {
+      toast.error("Please upload a valid image file (JPG, PNG, GIF, or WEBP)");
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
     }
   };
 
@@ -107,7 +116,7 @@ const ImageUpload = ({ currentImage, onImageSelect, onImageRemove }: ImageUpload
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*"
+        accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
         onChange={handleFileInput}
         className="hidden"
       />

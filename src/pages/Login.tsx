@@ -3,11 +3,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useNavigate } from "react-router-dom";
-import { signInWithEmailAndPassword, signInWithPopup, sendEmailVerification } from "firebase/auth";
+import { signInWithEmailAndPassword, signInWithPopup, sendEmailVerification, sendPasswordResetEmail } from "firebase/auth";
 import { auth, googleProvider, db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { toast } from "sonner";
 import { Eye, EyeOff } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -15,6 +23,9 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetDialogOpen, setResetDialogOpen] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,6 +109,54 @@ const Login = () => {
     }
   };
 
+  const handlePasswordReset = async () => {
+    if (!resetEmail) {
+      toast.error("Please enter your email address");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await sendPasswordResetEmail(auth, resetEmail);
+      toast.success("Password reset email sent! Check your inbox.");
+      setResetDialogOpen(false);
+      setResetEmail("");
+    } catch (error: any) {
+      if (error.code === "auth/user-not-found") {
+        toast.error("No account found with this email address");
+      } else if (error.code === "auth/invalid-email") {
+        toast.error("Invalid email address");
+      } else {
+        toast.error("Failed to send password reset email");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    if (!email) {
+      toast.error("Please enter your email address first");
+      return;
+    }
+
+    setResendLoading(true);
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      await sendEmailVerification(userCredential.user);
+      toast.success("Verification email sent! Check your inbox.");
+      await auth.signOut();
+    } catch (error: any) {
+      if (error.code === "auth/invalid-credential") {
+        toast.error("Please enter your password to resend verification email");
+      } else {
+        toast.error("Failed to resend verification email");
+      }
+    } finally {
+      setResendLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-6">
       <div className="max-w-md w-full space-y-8">
@@ -146,6 +205,55 @@ const Login = () => {
           <Button type="submit" className="w-full h-12" disabled={loading}>
             {loading ? "Signing in..." : "Sign In"}
           </Button>
+
+          <div className="flex items-center justify-between text-sm">
+            <Dialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
+              <DialogTrigger asChild>
+                <button
+                  type="button"
+                  className="text-primary hover:underline font-medium"
+                >
+                  Forgot Password?
+                </button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Reset Password</DialogTitle>
+                  <DialogDescription>
+                    Enter your email address and we'll send you a link to reset your password.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="reset-email">Email</Label>
+                    <Input
+                      id="reset-email"
+                      type="email"
+                      value={resetEmail}
+                      onChange={(e) => setResetEmail(e.target.value)}
+                      placeholder="you@example.com"
+                    />
+                  </div>
+                  <Button
+                    onClick={handlePasswordReset}
+                    disabled={loading}
+                    className="w-full"
+                  >
+                    {loading ? "Sending..." : "Send Reset Link"}
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            <button
+              type="button"
+              onClick={handleResendVerification}
+              disabled={resendLoading}
+              className="text-primary hover:underline font-medium"
+            >
+              {resendLoading ? "Sending..." : "Resend Verification"}
+            </button>
+          </div>
         </form>
 
         <div className="relative">
