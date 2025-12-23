@@ -63,10 +63,9 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
         return;
       }
 
-      // Backwards compatible defaults:
-      // - missing fields (undefined) are treated as "already done" for older users
-      const hasAcceptedPrivacyPolicy = userData?.hasAcceptedPrivacyPolicy !== false;
-      const hasCompletedOnboarding = userData?.hasCompletedOnboarding !== false;
+      // Check privacy policy and onboarding status - default to false if undefined (new users)
+      const hasAcceptedPrivacyPolicy = userData?.hasAcceptedPrivacyPolicy === true;
+      const hasCompletedOnboarding = userData?.hasCompletedOnboarding === true;
 
       setGate({ hasAcceptedPrivacyPolicy, hasCompletedOnboarding });
 
