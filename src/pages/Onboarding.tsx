@@ -17,9 +17,9 @@ import { playXPSound, playBadgeSound, triggerBadgeConfetti } from "@/utils/celeb
 
 const ONBOARDING_QUESTIONS = [
   {
-    id: "name",
-    question: "What should we call you?",
-    placeholder: "Enter your name",
+    id: "occupation",
+    question: "What do you do?",
+    placeholder: "e.g., Student, Software Engineer, Designer, Entrepreneur...",
     type: "input" as const,
     xp: 2,
   },
@@ -81,11 +81,10 @@ const Onboarding = () => {
 
     setLoading(true);
     try {
-      // Update user profile with onboarding completion
+      // Update user profile with onboarding completion (keep displayName from signup)
       await setDoc(
         doc(db, "users", user.uid),
         {
-          displayName: answers.name || "User",
           hasCompletedOnboarding: true,
           onboardingAnswers: answers,
         },
@@ -136,7 +135,6 @@ const Onboarding = () => {
       await setDoc(
         doc(db, "users", user.uid),
         {
-          displayName: "User",
           hasCompletedOnboarding: true,
         },
         { merge: true }
@@ -155,7 +153,7 @@ const Onboarding = () => {
     const badge = BADGES.find(b => b.id === 'getting_started')!;
     return (
       <OnboardingCelebration
-        name={answers.name || "User"}
+        name={user?.displayName || "User"}
         totalXP={totalXP}
         badge={badge}
         onContinue={handleCelebrationContinue}

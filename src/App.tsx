@@ -11,7 +11,7 @@ import { db } from "./lib/firebase";
 import { checkDailyBonus } from "./utils/gamification";
 import { playDailyBonusSound, triggerDailyBonusConfetti } from "./utils/celebrationEffects";
 import { toast } from "sonner";
-import Welcome from "./pages/Welcome";
+import Splash from "./pages/Splash";
 import Login from "./pages/Login";
 import SignUp from "./pages/SignUp";
 import Onboarding from "./pages/Onboarding";
@@ -113,7 +113,8 @@ const App = () => (
           <Sonner />
           <BrowserRouter>
             <Routes>
-              <Route path="/welcome" element={<PublicRoute><Welcome /></PublicRoute>} />
+              <Route path="/splash" element={<Splash />} />
+              <Route path="/welcome" element={<Splash />} />
               <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
               <Route path="/signup" element={<PublicRoute><SignUp /></PublicRoute>} />
               <Route path="/onboarding" element={<Onboarding />} />
