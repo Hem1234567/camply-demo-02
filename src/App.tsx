@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import Splash from "./pages/Splash";
 import Login from "./pages/Login";
 import SignUp from "./pages/SignUp";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
 import Onboarding from "./pages/Onboarding";
 import Home from "./pages/Home";
 import Tasks from "./pages/Tasks";
@@ -50,7 +51,8 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
         
         const checkOnboarding = async () => {
           // For existing users who don't have the field, assume they've completed onboarding
-          const completed = userData?.hasCompletedOnboarding !== false;
+          const hasPrivacyPolicy = userData?.hasAcceptedPrivacyPolicy !== false;
+          const completed = userData?.hasCompletedOnboarding !== false && hasPrivacyPolicy;
           setHasCompletedOnboarding(completed);
           
           // Check daily bonus only once per session for users who completed onboarding
@@ -117,6 +119,7 @@ const App = () => (
               <Route path="/welcome" element={<Splash />} />
               <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
               <Route path="/signup" element={<PublicRoute><SignUp /></PublicRoute>} />
+              <Route path="/privacy-policy" element={<PrivacyPolicy />} />
               <Route path="/onboarding" element={<Onboarding />} />
               <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
               <Route path="/tasks" element={<ProtectedRoute><Tasks /></ProtectedRoute>} />
