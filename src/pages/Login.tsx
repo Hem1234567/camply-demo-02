@@ -63,9 +63,13 @@ const Login = () => {
       
       toast.success("Welcome back!");
       
-      // Redirect admin to admin panel, others to home
+      // Redirect admin to admin panel, check privacy policy and onboarding for others
       if (email === "admin@gmail.com") {
         navigate("/admin-panel");
+      } else if (!userData?.hasAcceptedPrivacyPolicy) {
+        navigate("/privacy-policy");
+      } else if (!userData?.hasCompletedOnboarding) {
+        navigate("/onboarding");
       } else {
         navigate("/");
       }
