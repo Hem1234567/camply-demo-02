@@ -68,13 +68,18 @@ const SignUp = () => {
       // Send email verification
       await sendEmailVerification(userCredential.user);
       
-      // Sign out immediately to prevent auth state flash
+      // Sign out immediately and wait for it to complete
       await signOut(auth);
+      
+      // Small delay to ensure auth state is fully cleared
+      await new Promise(resolve => setTimeout(resolve, 100));
       
       toast.success("Account created! Please check your email to verify your account.", {
         duration: 5000
       });
-      navigate("/login", { replace: true });
+      
+      // Use window.location to ensure clean navigation
+      window.location.href = "/login";
     } catch (error: any) {
       if (error.code === "auth/email-already-in-use") {
         toast.error("Email already in use");
