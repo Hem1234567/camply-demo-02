@@ -11,9 +11,12 @@ import { Eye, EyeOff } from "lucide-react";
 
 const SignUp = () => {
   const navigate = useNavigate();
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const createUserProfile = async (userId: string, displayName: string, userEmail: string, requiresVerification: boolean = false) => {
@@ -38,13 +41,28 @@ const SignUp = () => {
 
   const handleEmailSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!name.trim()) {
+      toast.error("Please enter your name");
+      return;
+    }
+    
+    if (password !== confirmPassword) {
+      toast.error("Passwords do not match");
+      return;
+    }
+    
+    if (password.length < 6) {
+      toast.error("Password must be at least 6 characters");
+      return;
+    }
+    
     setLoading(true);
     
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const displayName = email.split('@')[0];
-      await updateProfile(userCredential.user, { displayName });
-      await createUserProfile(userCredential.user.uid, displayName, email, true);
+      await updateProfile(userCredential.user, { displayName: name.trim() });
+      await createUserProfile(userCredential.user.uid, name.trim(), email, true);
       
       // Send email verification
       await sendEmailVerification(userCredential.user);
@@ -112,7 +130,19 @@ const SignUp = () => {
           <p className="mt-2 text-muted-foreground">Start your personal growth journey</p>
         </div>
 
-        <form onSubmit={handleEmailSignup} className="space-y-6">
+        <form onSubmit={handleEmailSignup} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="name">Name</Label>
+            <Input
+              id="name"
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Your name"
+              required
+            />
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input
@@ -143,6 +173,28 @@ const SignUp = () => {
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
               >
                 {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="confirmPassword">Confirm Password</Label>
+            <div className="relative">
+              <Input
+                id="confirmPassword"
+                type={showConfirmPassword ? "text" : "password"}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="••••••••"
+                required
+                minLength={6}
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
               </button>
             </div>
           </div>
