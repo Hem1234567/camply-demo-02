@@ -6,7 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { useState, useEffect } from "react";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "./lib/firebase";
 import { checkDailyBonus } from "./utils/gamification";
 import { playDailyBonusSound, triggerDailyBonusConfetti } from "./utils/celebrationEffects";
@@ -31,64 +31,81 @@ const queryClient = new QueryClient();
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
-  const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState<boolean | null>(null);
+  const [gate, setGate] = useState<{
+    hasAcceptedPrivacyPolicy: boolean;
+    hasCompletedOnboarding: boolean;
+  } | null>(null);
   const [dailyBonusChecked, setDailyBonusChecked] = useState(false);
-  
+
   useEffect(() => {
-    if (user) {
-      // Reload user to get latest email verification status
-      user.reload().then(async () => {
-        // Check user profile for email verification requirement
-        const userDoc = await getDoc(doc(db, "users", user.uid));
-        const userData = userDoc.data();
-        const requiresVerification = userData?.emailVerificationEnabled === true;
-        
-        // Check if email is verified only for users who require it
-        if (user.email !== "admin@gmail.com" && requiresVerification && !user.emailVerified) {
-          toast.error("Please verify your email to access the app");
-          return;
-        }
-        
-        const checkOnboarding = async () => {
-          // For existing users who don't have the field, assume they've completed onboarding
-          const hasPrivacyPolicy = userData?.hasAcceptedPrivacyPolicy !== false;
-          const completed = userData?.hasCompletedOnboarding !== false && hasPrivacyPolicy;
-          setHasCompletedOnboarding(completed);
-          
-          // Check daily bonus only once per session for users who completed onboarding
-          if (completed && !dailyBonusChecked) {
-            setDailyBonusChecked(true);
-            const bonusXP = await checkDailyBonus(user.uid);
-            if (bonusXP > 0) {
-              setTimeout(() => {
-                playDailyBonusSound();
-                triggerDailyBonusConfetti();
-                toast.success(`Daily Login Bonus! +${bonusXP} XP 🎉`, {
-                  description: "Come back tomorrow for another bonus!"
-                });
-              }, 1000);
-            }
-          }
-        };
-        checkOnboarding();
-      });
-    } else {
+    if (!user) {
+      setGate(null);
       setDailyBonusChecked(false);
+      return;
     }
+
+    const unsubscribe = onSnapshot(doc(db, "users", user.uid), async (snap) => {
+      const userData = snap.data();
+
+      // Reload user to get latest email verification status
+      try {
+        await user.reload();
+      } catch {
+        // ignore reload errors
+      }
+
+      const requiresVerification = userData?.emailVerificationEnabled === true;
+
+      // Check if email is verified only for users who require it
+      if (user.email !== "admin@gmail.com" && requiresVerification && !user.emailVerified) {
+        toast.error("Please verify your email to access the app");
+        setGate({ hasAcceptedPrivacyPolicy: true, hasCompletedOnboarding: false });
+        return;
+      }
+
+      // Backwards compatible defaults:
+      // - missing fields (undefined) are treated as "already done" for older users
+      const hasAcceptedPrivacyPolicy = userData?.hasAcceptedPrivacyPolicy !== false;
+      const hasCompletedOnboarding = userData?.hasCompletedOnboarding !== false;
+
+      setGate({ hasAcceptedPrivacyPolicy, hasCompletedOnboarding });
+
+      // Check daily bonus only once per session for users who completed onboarding
+      if (hasAcceptedPrivacyPolicy && hasCompletedOnboarding && !dailyBonusChecked) {
+        setDailyBonusChecked(true);
+        const bonusXP = await checkDailyBonus(user.uid);
+        if (bonusXP > 0) {
+          setTimeout(() => {
+            playDailyBonusSound();
+            triggerDailyBonusConfetti();
+            toast.success(`Daily Login Bonus! +${bonusXP} XP 🎉`, {
+              description: "Come back tomorrow for another bonus!",
+            });
+          }, 1000);
+        }
+      }
+    });
+
+    return unsubscribe;
   }, [user, dailyBonusChecked]);
-  
-  if (loading || (user && hasCompletedOnboarding === null)) {
+
+  if (loading || (user && gate === null)) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     );
   }
-  
+
   if (!user) return <Navigate to="/welcome" />;
-  
-  if (!hasCompletedOnboarding) return <Navigate to="/onboarding" />;
-  
+
+  // Allow admin access without onboarding/privacy gating
+  if (user.email === "admin@gmail.com") return <>{children}</>;
+
+  if (!gate!.hasAcceptedPrivacyPolicy) return <Navigate to="/privacy-policy" replace />;
+
+  if (!gate!.hasCompletedOnboarding) return <Navigate to="/onboarding" replace />;
+
   return <>{children}</>;
 };
 

@@ -29,9 +29,10 @@ const PrivacyPolicy = () => {
         hasAcceptedPrivacyPolicy: true,
         privacyPolicyAcceptedAt: new Date().toISOString(),
       });
-      
+
       toast.success("Welcome! Let's get you started");
-      navigate("/onboarding", { replace: true });
+      // Let the route guard decide whether to go to onboarding or dashboard
+      navigate("/", { replace: true });
     } catch (error) {
       console.error("Error accepting privacy policy:", error);
       toast.error("Failed to continue. Please try again.");
