@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { useNavigate } from "react-router-dom";
 import { signInWithEmailAndPassword, signInWithPopup, sendEmailVerification, sendPasswordResetEmail } from "firebase/auth";
 import { auth, googleProvider, db } from "@/lib/firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import { toast } from "sonner";
 import { Eye, EyeOff } from "lucide-react";
 import {
@@ -93,14 +93,43 @@ const Login = () => {
     try {
       const result = await signInWithPopup(auth, googleProvider);
       
-      // Google accounts are already verified
-      toast.success("Welcome back!");
+      // Check if user profile exists in Firestore
+      const userDoc = await getDoc(doc(db, "users", result.user.uid));
       
-      // Redirect admin to admin panel, others to home
-      if (result.user.email === "admin@gmail.com") {
-        navigate("/admin-panel");
+      if (!userDoc.exists()) {
+        // New user - create profile with Google data and go to onboarding
+        await setDoc(doc(db, "users", result.user.uid), {
+          userId: result.user.uid,
+          email: result.user.email || "",
+          displayName: result.user.displayName || "User",
+          photoURL: result.user.photoURL || "",
+          totalXP: 0,
+          level: 1,
+          currentStreak: 0,
+          maxStreak: 0,
+          unlockedBadges: [],
+          entriesCount: 0,
+          themePreference: "light",
+          hasCompletedOnboarding: false,
+          emailVerificationEnabled: false,
+          lastActive: new Date().toISOString(),
+          createdAt: new Date().toISOString(),
+        });
+        
+        toast.success("Welcome to Camply!");
+        navigate("/onboarding", { replace: true });
       } else {
-        navigate("/");
+        // Existing user - check onboarding status
+        const userData = userDoc.data();
+        toast.success("Welcome back!");
+        
+        if (result.user.email === "admin@gmail.com") {
+          navigate("/admin-panel", { replace: true });
+        } else if (!userData?.hasCompletedOnboarding) {
+          navigate("/onboarding", { replace: true });
+        } else {
+          navigate("/", { replace: true });
+        }
       }
     } catch (error: any) {
       toast.error(error.message || "Failed to sign in with Google");
