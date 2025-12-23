@@ -11,6 +11,7 @@ import Layout from "@/components/Layout";
 
 interface UserData {
   displayName: string;
+  photoURL: string;
   level: number;
   totalXP: number;
   currentStreak: number;

@@ -33,6 +33,7 @@ const SignUp = () => {
       entriesCount: 0,
       themePreference: "light",
       hasCompletedOnboarding: false,
+      hasAcceptedPrivacyPolicy: false,
       emailVerificationEnabled: requiresVerification,
       lastActive: new Date().toISOString(),
       createdAt: new Date().toISOString(),
@@ -94,11 +95,13 @@ const SignUp = () => {
       const userDoc = await getDoc(doc(db, "users", result.user.uid));
       
       if (userDoc.exists()) {
-        // User already exists, redirect to login
+        // User already exists, check privacy policy and onboarding status
         toast.info("Account already exists. Logging you in...");
         const userData = userDoc.data();
         
-        if (!userData?.hasCompletedOnboarding) {
+        if (!userData?.hasAcceptedPrivacyPolicy) {
+          navigate("/privacy-policy", { replace: true });
+        } else if (!userData?.hasCompletedOnboarding) {
           navigate("/onboarding", { replace: true });
         } else {
           navigate("/", { replace: true });
@@ -120,13 +123,14 @@ const SignUp = () => {
         entriesCount: 0,
         themePreference: "light",
         hasCompletedOnboarding: false,
+        hasAcceptedPrivacyPolicy: false,
         emailVerificationEnabled: false,
         lastActive: new Date().toISOString(),
         createdAt: new Date().toISOString(),
       });
       
       toast.success("Welcome to Camply!");
-      navigate("/onboarding", { replace: true });
+      navigate("/privacy-policy", { replace: true });
     } catch (error: any) {
       toast.error(error.message || "Failed to sign up with Google");
     } finally {

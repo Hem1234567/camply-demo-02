@@ -97,7 +97,7 @@ const Login = () => {
       const userDoc = await getDoc(doc(db, "users", result.user.uid));
       
       if (!userDoc.exists()) {
-        // New user - create profile with Google data and go to onboarding
+        // New user - create profile with Google data and go to privacy policy
         await setDoc(doc(db, "users", result.user.uid), {
           userId: result.user.uid,
           email: result.user.email || "",
@@ -111,20 +111,23 @@ const Login = () => {
           entriesCount: 0,
           themePreference: "light",
           hasCompletedOnboarding: false,
+          hasAcceptedPrivacyPolicy: false,
           emailVerificationEnabled: false,
           lastActive: new Date().toISOString(),
           createdAt: new Date().toISOString(),
         });
         
         toast.success("Welcome to Camply!");
-        navigate("/onboarding", { replace: true });
+        navigate("/privacy-policy", { replace: true });
       } else {
-        // Existing user - check onboarding status
+        // Existing user - check onboarding and privacy policy status
         const userData = userDoc.data();
         toast.success("Welcome back!");
         
         if (result.user.email === "admin@gmail.com") {
           navigate("/admin-panel", { replace: true });
+        } else if (!userData?.hasAcceptedPrivacyPolicy) {
+          navigate("/privacy-policy", { replace: true });
         } else if (!userData?.hasCompletedOnboarding) {
           navigate("/onboarding", { replace: true });
         } else {
