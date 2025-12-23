@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useNavigate } from "react-router-dom";
 import { createUserWithEmailAndPassword, signInWithPopup, updateProfile, signOut, sendEmailVerification } from "firebase/auth";
-import { doc, setDoc } from "firebase/firestore";
+import { doc, setDoc, getDoc } from "firebase/firestore";
 import { auth, db, googleProvider } from "@/lib/firebase";
 import { toast } from "sonner";
 import { Eye, EyeOff } from "lucide-react";
@@ -90,28 +90,43 @@ const SignUp = () => {
     try {
       const result = await signInWithPopup(auth, googleProvider);
       
-      // Check if user already exists
-      const existingUser = result.user;
-      if (!existingUser.metadata.creationTime || existingUser.metadata.creationTime !== existingUser.metadata.lastSignInTime) {
-        await signOut(auth);
-        toast.error("Account already exists. Please login.");
-        navigate("/login", { replace: true });
+      // Check if user profile already exists in Firestore
+      const userDoc = await getDoc(doc(db, "users", result.user.uid));
+      
+      if (userDoc.exists()) {
+        // User already exists, redirect to login
+        toast.info("Account already exists. Logging you in...");
+        const userData = userDoc.data();
+        
+        if (!userData?.hasCompletedOnboarding) {
+          navigate("/onboarding", { replace: true });
+        } else {
+          navigate("/", { replace: true });
+        }
         return;
       }
       
-      // Google users are pre-verified, no need for email verification
-      await createUserProfile(
-        result.user.uid,
-        result.user.displayName || "User",
-        result.user.email || "",
-        false
-      );
+      // New user - create profile with Google data (name and photo from Google)
+      await setDoc(doc(db, "users", result.user.uid), {
+        userId: result.user.uid,
+        email: result.user.email || "",
+        displayName: result.user.displayName || "User",
+        photoURL: result.user.photoURL || "",
+        totalXP: 0,
+        level: 1,
+        currentStreak: 0,
+        maxStreak: 0,
+        unlockedBadges: [],
+        entriesCount: 0,
+        themePreference: "light",
+        hasCompletedOnboarding: false,
+        emailVerificationEnabled: false,
+        lastActive: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+      });
       
-      // Sign out immediately to prevent auth state flash
-      await signOut(auth);
-      
-      toast.success("Account created! Please login to continue.");
-      navigate("/login", { replace: true });
+      toast.success("Welcome to Camply!");
+      navigate("/onboarding", { replace: true });
     } catch (error: any) {
       toast.error(error.message || "Failed to sign up with Google");
     } finally {
