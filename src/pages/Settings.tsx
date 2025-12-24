@@ -78,8 +78,11 @@ const Settings = () => {
     isSubscribed: pushSubscribed,
     isLoading: pushLoading,
     error: pushError,
+    preferences: notificationPrefs,
+    preferencesLoading: notificationPrefsLoading,
     requestPermission: requestPushPermission,
     sendTestNotification,
+    updatePreferences: updateNotificationPrefs,
   } = usePushNotifications();
 
   // Voice recognition states
@@ -550,8 +553,16 @@ const Settings = () => {
                   </p>
                 </div>
                 <Switch
-                  checked={notificationEnabled}
-                  onCheckedChange={setNotificationEnabled}
+                  checked={notificationPrefs?.dailyReminders ?? true}
+                  onCheckedChange={async (checked) => {
+                    try {
+                      await updateNotificationPrefs({ dailyReminders: checked });
+                      toast.success(checked ? "Daily reminders enabled" : "Daily reminders disabled");
+                    } catch {
+                      toast.error("Failed to update preferences");
+                    }
+                  }}
+                  disabled={notificationPrefsLoading}
                 />
               </div>
               <div className="flex items-center justify-between">
@@ -562,22 +573,47 @@ const Settings = () => {
                   </p>
                 </div>
                 <Switch
-                  checked={weeklyInsightsEnabled}
-                  onCheckedChange={setWeeklyInsightsEnabled}
+                  checked={notificationPrefs?.weeklyInsights ?? false}
+                  onCheckedChange={async (checked) => {
+                    try {
+                      await updateNotificationPrefs({ weeklyInsights: checked });
+                      toast.success(checked ? "Weekly insights enabled" : "Weekly insights disabled");
+                    } catch {
+                      toast.error("Failed to update preferences");
+                    }
+                  }}
+                  disabled={notificationPrefsLoading}
                 />
               </div>
               <div className="pt-2">
                 <p className="font-medium mb-2">Reminder Time</p>
                 <select
                   className="w-full p-2 border border-border rounded-md bg-background text-foreground"
-                  value={reminderTime}
-                  onChange={(e) => setReminderTime(e.target.value)}
+                  value={notificationPrefs?.reminderTime ?? "21:00"}
+                  onChange={async (e) => {
+                    try {
+                      await updateNotificationPrefs({ reminderTime: e.target.value });
+                      toast.success("Reminder time updated");
+                    } catch {
+                      toast.error("Failed to update reminder time");
+                    }
+                  }}
+                  disabled={notificationPrefsLoading}
                 >
+                  <option value="06:00">6:00 AM</option>
+                  <option value="08:00">8:00 AM</option>
                   <option value="09:00">9:00 AM</option>
                   <option value="12:00">12:00 PM</option>
                   <option value="18:00">6:00 PM</option>
+                  <option value="20:00">8:00 PM</option>
                   <option value="21:00">9:00 PM</option>
+                  <option value="22:00">10:00 PM</option>
                 </select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {notificationPrefs?.dailyReminders 
+                    ? "You'll receive a reminder at this time daily while the app is open"
+                    : "Enable daily reminders to receive notifications"}
+                </p>
               </div>
 
               {/* Test Notification Button */}
