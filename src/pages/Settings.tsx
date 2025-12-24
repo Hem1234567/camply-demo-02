@@ -2,6 +2,8 @@ import { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Dialog,
   DialogContent,
@@ -23,8 +25,15 @@ import {
   AlertCircle,
   CheckCircle,
   X,
+  FileText,
+  Lock,
+  Eye,
 } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { doc, updateDoc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { toast } from "sonner";
 import Layout from "@/components/Layout";
 
 // Type definitions
@@ -45,6 +54,7 @@ interface SettingsSection {
 
 const Settings = () => {
   const { theme, toggleTheme } = useTheme();
+  const { user } = useAuth();
   const [activeModal, setActiveModal] = useState<string | null>(null);
   const [notificationEnabled, setNotificationEnabled] = useState(true);
   const [voiceEnabled, setVoiceEnabled] = useState(false);
@@ -52,6 +62,9 @@ const Settings = () => {
   const [cacheSize, setCacheSize] = useState("10 MB");
   const [autoPunctuation, setAutoPunctuation] = useState(true);
   const [selectedLanguage, setSelectedLanguage] = useState("en-US");
+  const [privacyPolicyAccepted, setPrivacyPolicyAccepted] = useState(false);
+  const [privacyPolicyLoading, setPrivacyPolicyLoading] = useState(false);
+  const [reAcceptChecked, setReAcceptChecked] = useState(false);
 
   // Voice recognition states
   const [isListening, setIsListening] = useState(false);
@@ -303,6 +316,13 @@ const Settings = () => {
       title: "Privacy & Security",
       items: [
         {
+          id: "privacy-policy",
+          icon: FileText,
+          label: "Privacy Policy",
+          description: "View and manage your privacy policy consent",
+          type: "navigation",
+        },
+        {
           id: "privacy",
           icon: Shield,
           label: "Privacy Settings",
@@ -342,6 +362,47 @@ const Settings = () => {
   const handleItemClick = (item: SettingItem) => {
     if (item.type === "navigation") {
       setActiveModal(item.id);
+      // Reset re-accept checkbox when opening privacy policy modal
+      if (item.id === "privacy-policy") {
+        setReAcceptChecked(false);
+        // Load current privacy policy status
+        loadPrivacyPolicyStatus();
+      }
+    }
+  };
+
+  const loadPrivacyPolicyStatus = async () => {
+    if (!user) return;
+    try {
+      const userDoc = await getDoc(doc(db, "users", user.uid));
+      const userData = userDoc.data();
+      setPrivacyPolicyAccepted(userData?.hasAcceptedPrivacyPolicy === true);
+    } catch (error) {
+      console.error("Error loading privacy policy status:", error);
+    }
+  };
+
+  const handleReAcceptPrivacyPolicy = async () => {
+    if (!user) return;
+    if (!reAcceptChecked) {
+      toast.error("Please check the box to confirm acceptance");
+      return;
+    }
+
+    setPrivacyPolicyLoading(true);
+    try {
+      await updateDoc(doc(db, "users", user.uid), {
+        hasAcceptedPrivacyPolicy: true,
+        privacyPolicyAcceptedAt: new Date().toISOString(),
+      });
+      setPrivacyPolicyAccepted(true);
+      toast.success("Privacy policy accepted successfully");
+      closeModal();
+    } catch (error) {
+      console.error("Error accepting privacy policy:", error);
+      toast.error("Failed to update. Please try again.");
+    } finally {
+      setPrivacyPolicyLoading(false);
     }
   };
 
@@ -351,6 +412,7 @@ const Settings = () => {
       stopListening();
     }
     setPermissionError("");
+    setReAcceptChecked(false);
   };
 
   const clearCache = () => {
@@ -861,6 +923,127 @@ const Settings = () => {
         </div>
       ),
     },
+    "privacy-policy": {
+      title: "Privacy Policy",
+      content: (
+        <div className="space-y-4">
+          {privacyPolicyAccepted && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-center gap-2">
+              <CheckCircle className="h-4 w-4 text-green-600" />
+              <p className="text-sm text-green-800">You have accepted the privacy policy</p>
+            </div>
+          )}
+
+          <ScrollArea className="h-64 rounded-md border p-4">
+            <div className="space-y-6 text-sm text-muted-foreground">
+              <section>
+                <h3 className="font-semibold text-foreground flex items-center gap-2 mb-2">
+                  <FileText className="h-4 w-4" />
+                  1. Introduction
+                </h3>
+                <p>
+                  Welcome to Camply. We are committed to protecting your personal information 
+                  and your right to privacy. This Privacy Policy explains how we collect, use, 
+                  disclose, and safeguard your information when you use our application.
+                </p>
+              </section>
+
+              <section>
+                <h3 className="font-semibold text-foreground flex items-center gap-2 mb-2">
+                  <Lock className="h-4 w-4" />
+                  2. Information We Collect
+                </h3>
+                <p className="mb-2">We collect information that you provide directly to us:</p>
+                <ul className="list-disc list-inside space-y-1 ml-2">
+                  <li>Account information (name, email address)</li>
+                  <li>Profile information (profile picture)</li>
+                  <li>Journal entries and personal reflections</li>
+                  <li>Goals and progress tracking data</li>
+                  <li>Usage data and app interactions</li>
+                </ul>
+              </section>
+
+              <section>
+                <h3 className="font-semibold text-foreground flex items-center gap-2 mb-2">
+                  <Eye className="h-4 w-4" />
+                  3. How We Use Your Information
+                </h3>
+                <p className="mb-2">We use the information we collect to:</p>
+                <ul className="list-disc list-inside space-y-1 ml-2">
+                  <li>Provide, maintain, and improve our services</li>
+                  <li>Track your personal growth journey</li>
+                  <li>Send you notifications and updates</li>
+                  <li>Personalize your experience</li>
+                  <li>Ensure the security of your account</li>
+                </ul>
+              </section>
+
+              <section>
+                <h3 className="font-semibold text-foreground mb-2">4. Data Security</h3>
+                <p>
+                  We implement appropriate technical and organizational measures to protect 
+                  your personal information. Your journal entries and personal data are 
+                  encrypted and stored securely. We do not sell your personal information 
+                  to third parties.
+                </p>
+              </section>
+
+              <section>
+                <h3 className="font-semibold text-foreground mb-2">5. Your Rights</h3>
+                <p className="mb-2">You have the right to:</p>
+                <ul className="list-disc list-inside space-y-1 ml-2">
+                  <li>Access your personal data</li>
+                  <li>Correct inaccurate data</li>
+                  <li>Request deletion of your data</li>
+                  <li>Export your data</li>
+                  <li>Withdraw consent at any time</li>
+                </ul>
+              </section>
+
+              <section>
+                <h3 className="font-semibold text-foreground mb-2">6. Contact Us</h3>
+                <p>
+                  If you have any questions about this Privacy Policy, please contact us 
+                  through the app settings or email support.
+                </p>
+              </section>
+
+              <section>
+                <h3 className="font-semibold text-foreground mb-2">7. Updates to This Policy</h3>
+                <p>
+                  We may update this Privacy Policy from time to time. We will notify you 
+                  of any changes by posting the new Privacy Policy on this page and updating 
+                  the "Last Updated" date.
+                </p>
+                <p className="mt-2 text-xs">Last Updated: December 2024</p>
+              </section>
+            </div>
+          </ScrollArea>
+
+          <div className="flex items-center space-x-3 p-4 bg-muted/50 rounded-lg">
+            <Checkbox 
+              id="re-accept" 
+              checked={reAcceptChecked} 
+              onCheckedChange={(checked) => setReAcceptChecked(checked === true)}
+            />
+            <label 
+              htmlFor="re-accept" 
+              className="text-sm font-medium cursor-pointer leading-relaxed"
+            >
+              I have read and agree to the Privacy Policy and Terms of Service
+            </label>
+          </div>
+
+          <Button
+            className="w-full"
+            onClick={handleReAcceptPrivacyPolicy}
+            disabled={!reAcceptChecked || privacyPolicyLoading}
+          >
+            {privacyPolicyLoading ? "Saving..." : privacyPolicyAccepted ? "Re-accept Privacy Policy" : "Accept Privacy Policy"}
+          </Button>
+        </div>
+      ),
+    },
   };
 
   return (
@@ -930,6 +1113,7 @@ const Settings = () => {
                 {activeModal === "notifications" && (
                   <Bell className="h-5 w-5" />
                 )}
+                {activeModal === "privacy-policy" && <FileText className="h-5 w-5" />}
                 {activeModal === "privacy" && <Shield className="h-5 w-5" />}
                 {activeModal === "data" && <Database className="h-5 w-5" />}
                 {activeModal === "help" && <HelpCircle className="h-5 w-5" />}
