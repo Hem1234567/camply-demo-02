@@ -36,11 +36,13 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     hasCompletedOnboarding: boolean;
   } | null>(null);
   const [dailyBonusChecked, setDailyBonusChecked] = useState(false);
+  const [needsEmailVerification, setNeedsEmailVerification] = useState(false);
 
   useEffect(() => {
     if (!user) {
       setGate(null);
       setDailyBonusChecked(false);
+      setNeedsEmailVerification(false);
       return;
     }
 
@@ -56,12 +58,15 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
       const requiresVerification = userData?.emailVerificationEnabled === true;
 
-      // Check if email is verified only for users who require it
+      // If this account requires verification, keep them on /login until verified
       if (user.email !== "admin@gmail.com" && requiresVerification && !user.emailVerified) {
-        toast.error("Please verify your email to access the app");
-        setGate({ hasAcceptedPrivacyPolicy: true, hasCompletedOnboarding: false });
+        setNeedsEmailVerification(true);
+        // Set a non-null gate to avoid indefinite spinner while redirecting
+        setGate({ hasAcceptedPrivacyPolicy: false, hasCompletedOnboarding: false });
         return;
       }
+
+      setNeedsEmailVerification(false);
 
       // Check privacy policy and onboarding status - default to false if undefined (new users)
       const hasAcceptedPrivacyPolicy = userData?.hasAcceptedPrivacyPolicy === true;
@@ -98,6 +103,8 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
   if (!user) return <Navigate to="/welcome" />;
 
+  if (needsEmailVerification) return <Navigate to="/login" replace />;
+
   // Allow admin access without onboarding/privacy gating
   if (user.email === "admin@gmail.com") return <>{children}</>;
 
@@ -110,7 +117,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
 const PublicRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
-  
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -118,7 +125,12 @@ const PublicRoute = ({ children }: { children: React.ReactNode }) => {
       </div>
     );
   }
-  
+
+  // Allow unverified users to access /login and /signup without being bounced to protected routes
+  if (user && user.email !== "admin@gmail.com" && !user.emailVerified) {
+    return <>{children}</>;
+  }
+
   return !user ? <>{children}</> : <Navigate to="/" />;
 };
 
