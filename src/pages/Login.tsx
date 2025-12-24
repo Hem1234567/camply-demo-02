@@ -65,10 +65,14 @@ const Login = () => {
       
       toast.success("Welcome back!");
       
-      // Redirect admin to admin panel, check privacy policy and onboarding for others
+      // Redirect admin to admin panel, check onboarding status for others
       if (email === "admin@gmail.com") {
         navigate("/admin-panel");
+      } else if (userData?.hasCompletedOnboarding) {
+        // Existing user - skip privacy policy, go directly home
+        navigate("/");
       } else if (!userData?.hasAcceptedPrivacyPolicy) {
+        // New user - needs to accept privacy policy
         navigate("/privacy-policy");
       } else if (!userData?.hasCompletedOnboarding) {
         navigate("/onboarding");
@@ -126,12 +130,15 @@ const Login = () => {
         toast.success("Welcome to Camply!");
         navigate("/privacy-policy", { replace: true });
       } else {
-        // Existing user - check onboarding and privacy policy status
+        // Existing user - check onboarding status
         const userData = userDoc.data();
         toast.success("Welcome back!");
         
         if (result.user.email === "admin@gmail.com") {
           navigate("/admin-panel", { replace: true });
+        } else if (userData?.hasCompletedOnboarding) {
+          // Existing user - skip privacy policy, go directly home
+          navigate("/", { replace: true });
         } else if (!userData?.hasAcceptedPrivacyPolicy) {
           navigate("/privacy-policy", { replace: true });
         } else if (!userData?.hasCompletedOnboarding) {

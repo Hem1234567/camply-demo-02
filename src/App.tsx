@@ -108,8 +108,14 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   // Allow admin access without onboarding/privacy gating
   if (user.email === "admin@gmail.com") return <>{children}</>;
 
+  // Existing users who completed onboarding should skip privacy policy
+  // (they existed before this feature was added)
+  if (gate!.hasCompletedOnboarding) return <>{children}</>;
+
+  // New users must accept privacy policy first
   if (!gate!.hasAcceptedPrivacyPolicy) return <Navigate to="/privacy-policy" replace />;
 
+  // Then complete onboarding
   if (!gate!.hasCompletedOnboarding) return <Navigate to="/onboarding" replace />;
 
   return <>{children}</>;
