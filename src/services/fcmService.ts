@@ -2,9 +2,8 @@ import { getMessaging, getToken, onMessage, isSupported, Messaging } from 'fireb
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { db, app } from '@/lib/firebase';
 
-// FCM VAPID key - you'll need to generate this in Firebase Console
-// Go to Project Settings > Cloud Messaging > Web Push certificates
-const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY || '';
+// FCM VAPID key for Web Push notifications
+const VAPID_KEY = 'BP1btEi2svQyiLzhmRTaVnSPk1f59TnmiezBmBJhARvP3Yv3KUL1Qq6KMAE8K1-4PBUyVZN87idJfpCbcinwq3U';
 
 let messagingInstance: Messaging | null = null;
 
