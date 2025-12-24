@@ -16,9 +16,11 @@ const Layout = ({ children, hideNav = false }: LayoutProps) => {
     <div className="min-h-screen bg-background pb-20">
       <header className="sticky top-0 z-40 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60 border-b border-border">
         <div className="max-w-lg mx-auto px-4 h-16 flex items-center justify-between">
-          <h1 className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-            Camply
-          </h1>
+          <img 
+            src="/journal-logo-removebg-preview.png" 
+            alt="Camply Logo" 
+            className="h-10 w-auto"
+          />
           <Button
             variant="ghost"
             size="icon"
