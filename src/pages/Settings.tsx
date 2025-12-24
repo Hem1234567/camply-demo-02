@@ -587,20 +587,128 @@ const Settings = () => {
               </div>
               <div className="pt-2">
                 <p className="font-medium mb-2">Reminder Time</p>
-                <input
-                  type="time"
-                  className="w-full p-2 border border-border rounded-md bg-background text-foreground"
-                  value={notificationPrefs?.reminderTime ?? "21:00"}
-                  onChange={async (e) => {
-                    try {
-                      await updateNotificationPrefs({ reminderTime: e.target.value });
-                      toast.success("Reminder time updated");
-                    } catch {
-                      toast.error("Failed to update reminder time");
-                    }
-                  }}
-                  disabled={notificationPrefsLoading}
-                />
+                <div className="flex gap-2">
+                  <div className="flex-1 flex gap-2">
+                    <select
+                      className="flex-1 p-2 border border-border rounded-md bg-background text-foreground"
+                      value={(() => {
+                        const time = notificationPrefs?.reminderTime ?? "21:00";
+                        const [hours] = time.split(":");
+                        const hour24 = parseInt(hours, 10);
+                        const hour12 = hour24 === 0 ? 12 : hour24 > 12 ? hour24 - 12 : hour24;
+                        return hour12.toString();
+                      })()}
+                      onChange={async (e) => {
+                        const currentTime = notificationPrefs?.reminderTime ?? "21:00";
+                        const [hours, minutes] = currentTime.split(":");
+                        const currentHour24 = parseInt(hours, 10);
+                        const isPM = currentHour24 >= 12;
+                        const newHour12 = parseInt(e.target.value, 10);
+                        let newHour24 = isPM 
+                          ? (newHour12 === 12 ? 12 : newHour12 + 12)
+                          : (newHour12 === 12 ? 0 : newHour12);
+                        const newTime = `${newHour24.toString().padStart(2, "0")}:${minutes}`;
+                        try {
+                          await updateNotificationPrefs({ reminderTime: newTime });
+                          toast.success("Reminder time updated");
+                        } catch {
+                          toast.error("Failed to update reminder time");
+                        }
+                      }}
+                      disabled={notificationPrefsLoading}
+                    >
+                      {[12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((hour) => (
+                        <option key={hour} value={hour}>{hour}</option>
+                      ))}
+                    </select>
+                    <select
+                      className="w-20 p-2 border border-border rounded-md bg-background text-foreground"
+                      value={(() => {
+                        const time = notificationPrefs?.reminderTime ?? "21:00";
+                        const [, minutes] = time.split(":");
+                        return minutes;
+                      })()}
+                      onChange={async (e) => {
+                        const currentTime = notificationPrefs?.reminderTime ?? "21:00";
+                        const [hours] = currentTime.split(":");
+                        const newTime = `${hours}:${e.target.value}`;
+                        try {
+                          await updateNotificationPrefs({ reminderTime: newTime });
+                          toast.success("Reminder time updated");
+                        } catch {
+                          toast.error("Failed to update reminder time");
+                        }
+                      }}
+                      disabled={notificationPrefsLoading}
+                    >
+                      {["00", "15", "30", "45"].map((min) => (
+                        <option key={min} value={min}>{min}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex rounded-md border border-border overflow-hidden">
+                    <button
+                      type="button"
+                      className={`px-3 py-2 text-sm font-medium transition-colors ${
+                        (() => {
+                          const time = notificationPrefs?.reminderTime ?? "21:00";
+                          const [hours] = time.split(":");
+                          return parseInt(hours, 10) < 12;
+                        })()
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-background text-foreground hover:bg-muted"
+                      }`}
+                      onClick={async () => {
+                        const currentTime = notificationPrefs?.reminderTime ?? "21:00";
+                        const [hours, minutes] = currentTime.split(":");
+                        const currentHour24 = parseInt(hours, 10);
+                        if (currentHour24 >= 12) {
+                          const newHour24 = currentHour24 === 12 ? 0 : currentHour24 - 12;
+                          const newTime = `${newHour24.toString().padStart(2, "0")}:${minutes}`;
+                          try {
+                            await updateNotificationPrefs({ reminderTime: newTime });
+                            toast.success("Reminder time updated");
+                          } catch {
+                            toast.error("Failed to update reminder time");
+                          }
+                        }
+                      }}
+                      disabled={notificationPrefsLoading}
+                    >
+                      AM
+                    </button>
+                    <button
+                      type="button"
+                      className={`px-3 py-2 text-sm font-medium transition-colors ${
+                        (() => {
+                          const time = notificationPrefs?.reminderTime ?? "21:00";
+                          const [hours] = time.split(":");
+                          return parseInt(hours, 10) >= 12;
+                        })()
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-background text-foreground hover:bg-muted"
+                      }`}
+                      onClick={async () => {
+                        const currentTime = notificationPrefs?.reminderTime ?? "21:00";
+                        const [hours, minutes] = currentTime.split(":");
+                        const currentHour24 = parseInt(hours, 10);
+                        if (currentHour24 < 12) {
+                          const newHour24 = currentHour24 === 0 ? 12 : currentHour24 + 12;
+                          const newTime = `${newHour24.toString().padStart(2, "0")}:${minutes}`;
+                          try {
+                            await updateNotificationPrefs({ reminderTime: newTime });
+                            toast.success("Reminder time updated");
+                          } catch {
+                            toast.error("Failed to update reminder time");
+                          }
+                        }
+                      }}
+                      disabled={notificationPrefsLoading}
+                    >
+                      PM
+                    </button>
+                  </div>
+                </div>
                 <p className="text-xs text-muted-foreground mt-1">
                   {notificationPrefs?.dailyReminders 
                     ? "You'll receive a reminder at this time daily while the app is open"
