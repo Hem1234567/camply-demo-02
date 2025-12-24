@@ -15,6 +15,7 @@ import {
   ChevronRight,
   Moon,
   Bell,
+  BellRing,
   Mic,
   MicOff,
   Shield,
@@ -28,6 +29,7 @@ import {
   FileText,
   Lock,
   Eye,
+  Send,
 } from "lucide-react";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -35,6 +37,7 @@ import { doc, updateDoc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { toast } from "sonner";
 import Layout from "@/components/Layout";
+import { usePushNotifications } from "@/hooks/use-push-notifications";
 
 // Type definitions
 interface SettingItem {
@@ -57,6 +60,8 @@ const Settings = () => {
   const { user } = useAuth();
   const [activeModal, setActiveModal] = useState<string | null>(null);
   const [notificationEnabled, setNotificationEnabled] = useState(true);
+  const [weeklyInsightsEnabled, setWeeklyInsightsEnabled] = useState(false);
+  const [reminderTime, setReminderTime] = useState("21:00");
   const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [privacyLevel, setPrivacyLevel] = useState("standard");
   const [cacheSize, setCacheSize] = useState("10 MB");
@@ -65,6 +70,17 @@ const Settings = () => {
   const [privacyPolicyAccepted, setPrivacyPolicyAccepted] = useState(false);
   const [privacyPolicyLoading, setPrivacyPolicyLoading] = useState(false);
   const [reAcceptChecked, setReAcceptChecked] = useState(false);
+
+  // Push notifications hook
+  const {
+    isSupported: pushSupported,
+    permission: pushPermission,
+    isSubscribed: pushSubscribed,
+    isLoading: pushLoading,
+    error: pushError,
+    requestPermission: requestPushPermission,
+    sendTestNotification,
+  } = usePushNotifications();
 
   // Voice recognition states
   const [isListening, setIsListening] = useState(false);
@@ -294,9 +310,11 @@ const Settings = () => {
         },
         {
           id: "notifications",
-          icon: Bell,
-          label: "Notifications",
-          description: "Daily reminders for journaling",
+          icon: pushSubscribed ? BellRing : Bell,
+          label: "Push Notifications",
+          description: pushSubscribed 
+            ? "Notifications enabled" 
+            : "Enable push notifications for reminders",
           type: "navigation",
         },
         {
@@ -425,39 +443,161 @@ const Settings = () => {
   // Modal content configurations
   const modalConfigs = {
     notifications: {
-      title: "Notification Settings",
+      title: "Push Notification Settings",
       content: (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-medium">Daily Reminders</p>
-              <p className="text-sm text-muted-foreground">
-                Receive daily journaling reminders
-              </p>
+          {/* Browser Support Check */}
+          {!pushSupported && (
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-400 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-yellow-800 dark:text-yellow-300">
+                    Browser Not Supported
+                  </p>
+                  <p className="text-sm text-yellow-700 dark:text-yellow-400 mt-1">
+                    Push notifications are not supported in your browser. Try using Chrome, Edge, or Safari.
+                  </p>
+                </div>
+              </div>
             </div>
-            <Switch
-              checked={notificationEnabled}
-              onCheckedChange={setNotificationEnabled}
-            />
-          </div>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-medium">Weekly Insights</p>
-              <p className="text-sm text-muted-foreground">
-                Get weekly progress reports
-              </p>
+          )}
+
+          {/* Permission Status */}
+          {pushSupported && (
+            <div
+              className={`p-3 rounded-lg ${
+                pushSubscribed
+                  ? "bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800"
+                  : pushPermission === "denied"
+                  ? "bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800"
+                  : "bg-muted border border-border"
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                {pushSubscribed ? (
+                  <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+                ) : pushPermission === "denied" ? (
+                  <X className="h-4 w-4 text-red-600 dark:text-red-400" />
+                ) : (
+                  <Bell className="h-4 w-4 text-muted-foreground" />
+                )}
+                <p
+                  className={`text-sm font-medium ${
+                    pushSubscribed
+                      ? "text-green-800 dark:text-green-300"
+                      : pushPermission === "denied"
+                      ? "text-red-800 dark:text-red-300"
+                      : "text-foreground"
+                  }`}
+                >
+                  {pushSubscribed
+                    ? "Notifications enabled"
+                    : pushPermission === "denied"
+                    ? "Notifications blocked"
+                    : "Notifications not enabled"}
+                </p>
+              </div>
+              {pushPermission === "denied" && (
+                <p className="text-sm text-red-700 dark:text-red-400 mt-1">
+                  Please enable notifications in your browser settings.
+                </p>
+              )}
             </div>
-            <Switch checked={false} />
-          </div>
-          <div className="pt-4">
-            <p className="font-medium mb-2">Reminder Time</p>
-            <select className="w-full p-2 border rounded-md">
-              <option>9:00 AM</option>
-              <option>12:00 PM</option>
-              <option>6:00 PM</option>
-              <option>9:00 PM</option>
-            </select>
-          </div>
+          )}
+
+          {/* Error Message */}
+          {pushError && (
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400 mt-0.5" />
+                <p className="text-sm text-red-700 dark:text-red-400">{pushError}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Enable Button */}
+          {pushSupported && !pushSubscribed && pushPermission !== "denied" && (
+            <Button
+              onClick={async () => {
+                const granted = await requestPushPermission();
+                if (granted) {
+                  toast.success("Push notifications enabled!");
+                }
+              }}
+              disabled={pushLoading}
+              className="w-full"
+            >
+              {pushLoading ? (
+                "Requesting permission..."
+              ) : (
+                <>
+                  <Bell className="h-4 w-4 mr-2" />
+                  Enable Push Notifications
+                </>
+              )}
+            </Button>
+          )}
+
+          {/* Settings when enabled */}
+          {pushSubscribed && (
+            <>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium">Daily Reminders</p>
+                  <p className="text-sm text-muted-foreground">
+                    Receive daily journaling reminders
+                  </p>
+                </div>
+                <Switch
+                  checked={notificationEnabled}
+                  onCheckedChange={setNotificationEnabled}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium">Weekly Insights</p>
+                  <p className="text-sm text-muted-foreground">
+                    Get weekly progress reports
+                  </p>
+                </div>
+                <Switch
+                  checked={weeklyInsightsEnabled}
+                  onCheckedChange={setWeeklyInsightsEnabled}
+                />
+              </div>
+              <div className="pt-2">
+                <p className="font-medium mb-2">Reminder Time</p>
+                <select
+                  className="w-full p-2 border border-border rounded-md bg-background text-foreground"
+                  value={reminderTime}
+                  onChange={(e) => setReminderTime(e.target.value)}
+                >
+                  <option value="09:00">9:00 AM</option>
+                  <option value="12:00">12:00 PM</option>
+                  <option value="18:00">6:00 PM</option>
+                  <option value="21:00">9:00 PM</option>
+                </select>
+              </div>
+
+              {/* Test Notification Button */}
+              <Button
+                variant="outline"
+                onClick={() => {
+                  const notification = sendTestNotification();
+                  if (notification) {
+                    toast.success("Test notification sent!");
+                  } else {
+                    toast.error("Failed to send notification");
+                  }
+                }}
+                className="w-full"
+              >
+                <Send className="h-4 w-4 mr-2" />
+                Send Test Notification
+              </Button>
+            </>
+          )}
         </div>
       ),
     },
