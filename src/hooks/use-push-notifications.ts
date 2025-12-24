@@ -1,11 +1,19 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 import {
   getNotificationPreferences,
   saveNotificationPreferences,
   getTimeUntilReminder,
   NotificationPreferences,
 } from "@/services/notificationService";
+import {
+  getFCMToken,
+  getSavedFCMToken,
+  onForegroundMessage,
+  isFCMSupported,
+  registerServiceWorker,
+} from "@/services/fcmService";
 
 interface PushNotificationState {
   isSupported: boolean;
@@ -15,6 +23,8 @@ interface PushNotificationState {
   error: string | null;
   preferences: NotificationPreferences | null;
   preferencesLoading: boolean;
+  fcmToken: string | null;
+  fcmSupported: boolean;
 }
 
 export function usePushNotifications() {
@@ -29,42 +39,77 @@ export function usePushNotifications() {
     error: null,
     preferences: null,
     preferencesLoading: true,
+    fcmToken: null,
+    fcmSupported: false,
   });
 
-  // Check browser support
+  // Check browser support and FCM support
   useEffect(() => {
-    const isSupported = "Notification" in window && "serviceWorker" in navigator;
-    
-    if (isSupported) {
-      setState((prev) => ({
-        ...prev,
-        isSupported: true,
-        permission: Notification.permission,
-        isSubscribed: Notification.permission === "granted",
-      }));
-    }
+    const checkSupport = async () => {
+      const isSupported = "Notification" in window && "serviceWorker" in navigator;
+      const fcmSupported = await isFCMSupported();
+      
+      if (isSupported) {
+        setState((prev) => ({
+          ...prev,
+          isSupported: true,
+          fcmSupported,
+          permission: Notification.permission,
+          isSubscribed: Notification.permission === "granted",
+        }));
+
+        // Register service worker for FCM
+        if (fcmSupported) {
+          await registerServiceWorker();
+        }
+      }
+    };
+
+    checkSupport();
   }, []);
 
-  // Load preferences from Firebase
+  // Load preferences and FCM token from Firebase
   useEffect(() => {
     if (!user) {
-      setState((prev) => ({ ...prev, preferences: null, preferencesLoading: false }));
+      setState((prev) => ({ ...prev, preferences: null, preferencesLoading: false, fcmToken: null }));
       return;
     }
 
-    const loadPreferences = async () => {
+    const loadData = async () => {
       setState((prev) => ({ ...prev, preferencesLoading: true }));
       try {
-        const prefs = await getNotificationPreferences(user.uid);
-        setState((prev) => ({ ...prev, preferences: prefs, preferencesLoading: false }));
+        const [prefs, savedToken] = await Promise.all([
+          getNotificationPreferences(user.uid),
+          getSavedFCMToken(user.uid),
+        ]);
+        setState((prev) => ({ 
+          ...prev, 
+          preferences: prefs, 
+          preferencesLoading: false,
+          fcmToken: savedToken,
+        }));
       } catch (error) {
-        console.error("Error loading notification preferences:", error);
+        console.error("Error loading notification data:", error);
         setState((prev) => ({ ...prev, preferencesLoading: false }));
       }
     };
 
-    loadPreferences();
+    loadData();
   }, [user]);
+
+  // Listen for foreground messages
+  useEffect(() => {
+    if (!state.fcmSupported || !state.isSubscribed) return;
+
+    const unsubscribe = onForegroundMessage((payload) => {
+      // Show toast for foreground messages
+      toast(payload.notification?.title || "New notification", {
+        description: payload.notification?.body,
+      });
+    });
+
+    return unsubscribe;
+  }, [state.fcmSupported, state.isSubscribed]);
 
   // Schedule reminder based on preferences
   useEffect(() => {
@@ -133,9 +178,18 @@ export function usePushNotifications() {
           : null,
       }));
 
-      // Save to Firebase if granted
+      // Save to Firebase and get FCM token if granted
       if (isGranted && user) {
         await saveNotificationPreferences(user.uid, { enabled: true });
+        
+        // Get FCM token for background notifications
+        if (state.fcmSupported) {
+          const token = await getFCMToken(user.uid);
+          if (token) {
+            setState((prev) => ({ ...prev, fcmToken: token }));
+          }
+        }
+        
         const prefs = await getNotificationPreferences(user.uid);
         setState((prev) => ({ ...prev, preferences: prefs }));
       }
@@ -150,7 +204,7 @@ export function usePushNotifications() {
       }));
       return false;
     }
-  }, [state.isSupported, user]);
+  }, [state.isSupported, state.fcmSupported, user]);
 
   const sendNotification = useCallback(
     (title: string, options?: NotificationOptions) => {
