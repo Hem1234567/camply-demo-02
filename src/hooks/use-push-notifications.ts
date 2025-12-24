@@ -1,4 +1,11 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import {
+  getNotificationPreferences,
+  saveNotificationPreferences,
+  getTimeUntilReminder,
+  NotificationPreferences,
+} from "@/services/notificationService";
 
 interface PushNotificationState {
   isSupported: boolean;
@@ -6,19 +13,26 @@ interface PushNotificationState {
   isSubscribed: boolean;
   isLoading: boolean;
   error: string | null;
+  preferences: NotificationPreferences | null;
+  preferencesLoading: boolean;
 }
 
 export function usePushNotifications() {
+  const { user } = useAuth();
+  const reminderTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
   const [state, setState] = useState<PushNotificationState>({
     isSupported: false,
     permission: "default",
     isSubscribed: false,
     isLoading: false,
     error: null,
+    preferences: null,
+    preferencesLoading: true,
   });
 
+  // Check browser support
   useEffect(() => {
-    // Check if push notifications are supported
     const isSupported = "Notification" in window && "serviceWorker" in navigator;
     
     if (isSupported) {
@@ -30,6 +44,68 @@ export function usePushNotifications() {
       }));
     }
   }, []);
+
+  // Load preferences from Firebase
+  useEffect(() => {
+    if (!user) {
+      setState((prev) => ({ ...prev, preferences: null, preferencesLoading: false }));
+      return;
+    }
+
+    const loadPreferences = async () => {
+      setState((prev) => ({ ...prev, preferencesLoading: true }));
+      try {
+        const prefs = await getNotificationPreferences(user.uid);
+        setState((prev) => ({ ...prev, preferences: prefs, preferencesLoading: false }));
+      } catch (error) {
+        console.error("Error loading notification preferences:", error);
+        setState((prev) => ({ ...prev, preferencesLoading: false }));
+      }
+    };
+
+    loadPreferences();
+  }, [user]);
+
+  // Schedule reminder based on preferences
+  useEffect(() => {
+    if (!state.preferences || !state.isSubscribed) return;
+    if (!state.preferences.enabled || !state.preferences.dailyReminders) return;
+
+    // Clear existing timeout
+    if (reminderTimeoutRef.current) {
+      clearTimeout(reminderTimeoutRef.current);
+    }
+
+    const scheduleNextReminder = () => {
+      const delay = getTimeUntilReminder(state.preferences!.reminderTime);
+      
+      reminderTimeoutRef.current = setTimeout(() => {
+        sendNotification("Daily Journaling Reminder", {
+          body: "Time to reflect on your day! Open Camply to write your journal entry.",
+          tag: "daily-reminder",
+          requireInteraction: true,
+        });
+
+        // Update last reminder sent time
+        if (user) {
+          saveNotificationPreferences(user.uid, {
+            lastReminderSent: new Date().toISOString(),
+          });
+        }
+
+        // Schedule next reminder for tomorrow
+        scheduleNextReminder();
+      }, delay);
+    };
+
+    scheduleNextReminder();
+
+    return () => {
+      if (reminderTimeoutRef.current) {
+        clearTimeout(reminderTimeoutRef.current);
+      }
+    };
+  }, [state.preferences, state.isSubscribed, user]);
 
   const requestPermission = useCallback(async (): Promise<boolean> => {
     if (!state.isSupported) {
@@ -45,17 +121,26 @@ export function usePushNotifications() {
     try {
       const permission = await Notification.requestPermission();
       
+      const isGranted = permission === "granted";
+      
       setState((prev) => ({
         ...prev,
         permission,
-        isSubscribed: permission === "granted",
+        isSubscribed: isGranted,
         isLoading: false,
         error: permission === "denied" 
           ? "Notification permission was denied. Please enable it in your browser settings." 
           : null,
       }));
 
-      return permission === "granted";
+      // Save to Firebase if granted
+      if (isGranted && user) {
+        await saveNotificationPreferences(user.uid, { enabled: true });
+        const prefs = await getNotificationPreferences(user.uid);
+        setState((prev) => ({ ...prev, preferences: prefs }));
+      }
+
+      return isGranted;
     } catch (error) {
       console.error("Error requesting notification permission:", error);
       setState((prev) => ({
@@ -65,7 +150,7 @@ export function usePushNotifications() {
       }));
       return false;
     }
-  }, [state.isSupported]);
+  }, [state.isSupported, user]);
 
   const sendNotification = useCallback(
     (title: string, options?: NotificationOptions) => {
@@ -97,37 +182,22 @@ export function usePushNotifications() {
     });
   }, [sendNotification]);
 
-  const scheduleReminder = useCallback(
-    (time: string, message: string) => {
-      if (!state.isSubscribed) {
-        console.warn("Cannot schedule reminder: not subscribed");
-        return null;
+  const updatePreferences = useCallback(
+    async (updates: Partial<NotificationPreferences>) => {
+      if (!user) return;
+
+      try {
+        await saveNotificationPreferences(user.uid, updates);
+        setState((prev) => ({
+          ...prev,
+          preferences: prev.preferences ? { ...prev.preferences, ...updates } : null,
+        }));
+      } catch (error) {
+        console.error("Error updating notification preferences:", error);
+        throw error;
       }
-
-      // Parse the time (HH:MM format)
-      const [hours, minutes] = time.split(":").map(Number);
-      const now = new Date();
-      const scheduledTime = new Date();
-      scheduledTime.setHours(hours, minutes, 0, 0);
-
-      // If the time has passed today, schedule for tomorrow
-      if (scheduledTime <= now) {
-        scheduledTime.setDate(scheduledTime.getDate() + 1);
-      }
-
-      const delay = scheduledTime.getTime() - now.getTime();
-
-      // Store the timeout ID so it can be cleared if needed
-      const timeoutId = setTimeout(() => {
-        sendNotification("Daily Reminder", {
-          body: message,
-          tag: "daily-reminder",
-        });
-      }, delay);
-
-      return timeoutId;
     },
-    [state.isSubscribed, sendNotification]
+    [user]
   );
 
   return {
@@ -135,6 +205,6 @@ export function usePushNotifications() {
     requestPermission,
     sendNotification,
     sendTestNotification,
-    scheduleReminder,
+    updatePreferences,
   };
 }
