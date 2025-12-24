@@ -75,11 +75,11 @@ const SignUp = () => {
       await new Promise(resolve => setTimeout(resolve, 100));
       
       toast.success("Account created! Please check your email to verify your account.", {
-        duration: 5000
+        duration: 5000,
       });
-      
-      // Use window.location to ensure clean navigation
-      window.location.href = "/login";
+
+      // Navigate without a full page reload (prevents 404s on hosts without SPA rewrites)
+      navigate("/login", { replace: true });
     } catch (error: any) {
       if (error.code === "auth/email-already-in-use") {
         toast.error("Email already in use");
