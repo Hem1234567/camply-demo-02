@@ -40,6 +40,16 @@ service cloud.firestore {
       
       // Only admins can delete users
       allow delete: if isAdmin();
+      
+      // Notification settings subcollection - users can manage their own
+      match /settings/notifications {
+        allow read, write: if isOwner(userId);
+      }
+      
+      // FCM tokens subcollection - users can manage their own
+      match /fcmTokens/{tokenId} {
+        allow read, write: if isOwner(userId);
+      }
     }
     
     // Daily Tasks collection
