@@ -587,7 +587,8 @@ const Settings = () => {
               </div>
               <div className="pt-2">
                 <p className="font-medium mb-2">Reminder Time</p>
-                <select
+                <input
+                  type="time"
                   className="w-full p-2 border border-border rounded-md bg-background text-foreground"
                   value={notificationPrefs?.reminderTime ?? "21:00"}
                   onChange={async (e) => {
@@ -599,16 +600,7 @@ const Settings = () => {
                     }
                   }}
                   disabled={notificationPrefsLoading}
-                >
-                  <option value="06:00">6:00 AM</option>
-                  <option value="08:00">8:00 AM</option>
-                  <option value="09:00">9:00 AM</option>
-                  <option value="12:00">12:00 PM</option>
-                  <option value="18:00">6:00 PM</option>
-                  <option value="20:00">8:00 PM</option>
-                  <option value="21:00">9:00 PM</option>
-                  <option value="22:00">10:00 PM</option>
-                </select>
+                />
                 <p className="text-xs text-muted-foreground mt-1">
                   {notificationPrefs?.dailyReminders 
                     ? "You'll receive a reminder at this time daily while the app is open"
