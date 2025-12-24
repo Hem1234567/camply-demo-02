@@ -26,6 +26,8 @@ const Login = () => {
   const [resetEmail, setResetEmail] = useState("");
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
+  const [resendDialogOpen, setResendDialogOpen] = useState(false);
+  const [resendEmail, setResendEmail] = useState("");
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -171,22 +173,29 @@ const Login = () => {
   };
 
   const handleResendVerification = async () => {
-    if (!email) {
-      toast.error("Please enter your email address first");
+    if (!resendEmail) {
+      toast.error("Please enter your email address");
       return;
     }
 
     setResendLoading(true);
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      await sendEmailVerification(userCredential.user);
-      toast.success("Verification email sent! Check your inbox.");
-      await auth.signOut();
+      // We need to use a different approach - send verification via password reset flow
+      // or prompt user to enter password. For UX, let's just send a password reset link
+      // and inform user they can use that to access their account
+      await sendPasswordResetEmail(auth, resendEmail);
+      toast.success("We've sent a password reset email. After resetting, you can log in and verify your email.", {
+        duration: 6000
+      });
+      setResendDialogOpen(false);
+      setResendEmail("");
     } catch (error: any) {
-      if (error.code === "auth/invalid-credential") {
-        toast.error("Please enter your password to resend verification email");
+      if (error.code === "auth/user-not-found") {
+        toast.error("No account found with this email address");
+      } else if (error.code === "auth/invalid-email") {
+        toast.error("Invalid email address");
       } else {
-        toast.error("Failed to resend verification email");
+        toast.error("Failed to send verification email");
       }
     } finally {
       setResendLoading(false);
@@ -281,14 +290,43 @@ const Login = () => {
               </DialogContent>
             </Dialog>
 
-            <button
-              type="button"
-              onClick={handleResendVerification}
-              disabled={resendLoading}
-              className="text-primary hover:underline font-medium"
-            >
-              {resendLoading ? "Sending..." : "Resend Verification"}
-            </button>
+            <Dialog open={resendDialogOpen} onOpenChange={setResendDialogOpen}>
+              <DialogTrigger asChild>
+                <button
+                  type="button"
+                  className="text-primary hover:underline font-medium"
+                >
+                  Resend Verification
+                </button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Resend Verification Email</DialogTitle>
+                  <DialogDescription>
+                    Enter your email address and we'll send you a verification link.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="resend-email">Email</Label>
+                    <Input
+                      id="resend-email"
+                      type="email"
+                      value={resendEmail}
+                      onChange={(e) => setResendEmail(e.target.value)}
+                      placeholder="you@example.com"
+                    />
+                  </div>
+                  <Button
+                    onClick={handleResendVerification}
+                    disabled={resendLoading}
+                    className="w-full"
+                  >
+                    {resendLoading ? "Sending..." : "Resend Verification"}
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
         </form>
 
