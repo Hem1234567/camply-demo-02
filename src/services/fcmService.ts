@@ -1,26 +1,24 @@
-import { getMessaging, getToken, onMessage, isSupported } from 'firebase/messaging';
+import { getMessaging, getToken, onMessage, isSupported, Messaging } from 'firebase/messaging';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-import { initializeApp, getApp } from 'firebase/app';
+import { db, app } from '@/lib/firebase';
 
 // FCM VAPID key - you'll need to generate this in Firebase Console
 // Go to Project Settings > Cloud Messaging > Web Push certificates
 const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY || '';
 
-let messagingInstance: ReturnType<typeof getMessaging> | null = null;
+let messagingInstance: Messaging | null = null;
 
-// Initialize messaging
-async function getMessagingInstance() {
+// Initialize messaging lazily
+async function getMessagingInstance(): Promise<Messaging | null> {
   if (messagingInstance) return messagingInstance;
   
-  const supported = await isSupported();
-  if (!supported) {
-    console.warn('Firebase Messaging is not supported in this browser');
-    return null;
-  }
-
   try {
-    const app = getApp();
+    const supported = await isSupported();
+    if (!supported) {
+      console.warn('Firebase Messaging is not supported in this browser');
+      return null;
+    }
+
     messagingInstance = getMessaging(app);
     return messagingInstance;
   } catch (error) {
